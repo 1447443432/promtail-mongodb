@@ -6,7 +6,7 @@
 
 使用 `Actions → Image Make → Run workflow`，各功能可独立开关：
 
-推送到 `master` 分支时模块默认开启，但每个模块会先检查自己的地址、账号和密码；配置不完整时只跳过对应模块，并在 Actions Summary 中显示原因。自动触发使用 `sha-<commit>` 作为镜像和 Release tag。
+推送到 `master` 分支时模块默认开启，但每个模块会先检查自己的地址、账号和密码；配置不完整时只跳过对应模块，并在 Actions Summary 中显示原因。主仓库始终作为默认构建目标；如果阿里云仓库配置完整则同时推送，并优先使用阿里云镜像制作 Release 包，否则使用主仓库镜像。自动触发使用配置的 `IMAGE_TAG`，未配置时为 `1.0.0`。
 
 - `build_image`：是否执行 Dockerfile 构建。
 - `push_registry`：是否推送到主镜像仓库。

@@ -251,10 +251,10 @@ jobs:
             echo 'platforms must include linux/amd64 and linux/arm64' >&2
             exit 1
           }
-          if [[ "$PUSH_REGISTRY" == true ]]; then
-            package_image="$TARGET_IMAGE"
-          elif [[ "$PUSH_ALIYUN" == true ]]; then
+          if [[ "$PUSH_ALIYUN" == true ]]; then
             package_image="$ALIYUN_IMAGE"
+          elif [[ "$PUSH_REGISTRY" == true ]]; then
+            package_image="$TARGET_IMAGE"
           else
             echo 'enable push_registry or push_aliyun to create a release' >&2
             exit 1
@@ -304,7 +304,7 @@ jobs:
           aliyun = {'amd64': os.environ['ALIYUN_IMAGE_AMD64'], 'arm64': os.environ['ALIYUN_IMAGE_ARM64']}
           for path in sorted(files):
               arch = path.rsplit('_', 1)[1].removesuffix('.tar.gz')
-              image = primary[arch] if os.environ['PUSH_REGISTRY'] == 'true' else aliyun[arch]
+              image = aliyun[arch] if os.environ['PUSH_ALIYUN'] == 'true' else primary[arch]
               images.append({'architecture': arch, 'platform': f'linux/{arch}', 'image': image, 'archive': os.path.basename(path), 'sha256': hashlib.sha256(open(path, 'rb').read()).hexdigest()})
           base = f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/releases/download/{os.environ['RELEASE_TAG']}"
           for item in images:
