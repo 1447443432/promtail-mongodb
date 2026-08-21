@@ -80,9 +80,9 @@ env:
   WORKFLOW_PUSH_ALIYUN: ${{ github.event_name == 'push' && 'true' || inputs.push_aliyun }}
   WORKFLOW_CREATE_RELEASE: ${{ github.event_name == 'push' && 'true' || inputs.create_release }}
   WORKFLOW_NOTIFY_HAP: ${{ github.event_name == 'push' && 'true' || inputs.notify_hap }}
-  REGISTRY: ${{ vars.REGISTRY }}
-  REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
-  REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+  REGISTRY: ${{ vars.REGISTRY || 'registry.cn-hangzhou.aliyuncs.com' }}
+  REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME || secrets.ALIYUN_REGISTRY_USERNAME }}
+  REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD || secrets.ALIYUN_REGISTRY_PASSWORD }}
   HAP_WEBHOOK_URL: ${{ secrets.HAP_WEBHOOK_URL }}
   HAP_WEBHOOK_APP_KEY: ${{ secrets.HAP_WEBHOOK_APP_KEY }}
   HAP_WEBHOOK_SIGN: ${{ secrets.HAP_WEBHOOK_SIGN }}
@@ -132,10 +132,12 @@ jobs:
           can_package = enabled('CREATE_RELEASE') and source
           can_release = can_package
           reasons = []
+          primary_missing = [k for k in ('REGISTRY', 'REGISTRY_USERNAME', 'REGISTRY_PASSWORD', 'TARGET_IMAGE_AMD64', 'TARGET_IMAGE_ARM64') if not os.environ.get(k, '').strip()]
+          aliyun_missing = [k for k in ('ALIYUN_REGISTRY', 'ALIYUN_USERNAME', 'ALIYUN_PASSWORD', 'ALIYUN_IMAGE_AMD64', 'ALIYUN_IMAGE_ARM64') if not os.environ.get(k, '').strip()]
           if enabled('PUSH_REGISTRY') and not primary:
-              reasons.append('Primary registry skipped: REGISTRY, credentials, or target_image is missing.')
+              reasons.append('Primary registry skipped; missing: ' + ', '.join(primary_missing))
           if enabled('PUSH_ALIYUN') and not aliyun:
-              reasons.append('Aliyun registry skipped: ALIYUN_REGISTRY, credentials, or aliyun_image is missing.')
+              reasons.append('Aliyun registry skipped; missing: ' + ', '.join(aliyun_missing))
           if not source:
               reasons.append('Build/package skipped: no usable image registry is configured.')
           if enabled('CREATE_RELEASE') and source:

@@ -31,7 +31,7 @@ tag 默认是 `1.0.0`，手动运行时可在 Workflow 输入中修改；自动�
 
 需要在仓库 `Settings → Secrets and variables → Actions` 配置：
 
-- 主仓库：Variable `REGISTRY`；Secrets `REGISTRY_USERNAME`、`REGISTRY_PASSWORD`
+- 主仓库默认地址是 `registry.cn-hangzhou.aliyuncs.com`；Secrets `REGISTRY_USERNAME`、`REGISTRY_PASSWORD`（也可使用阿里云账号 Secrets）
 - 阿里云：可选 Variable `ALIYUN_REGISTRY`；Secrets `ALIYUN_REGISTRY_USERNAME`、`ALIYUN_REGISTRY_PASSWORD`
 - HAP：Secret `HAP_WEBHOOK_URL`；如开启应用授权，再配置 `HAP_WEBHOOK_APP_KEY`、`HAP_WEBHOOK_SIGN`
 
