@@ -51,6 +51,22 @@ HAP 配置：
 
 HAP URL 为空时跳过通知，并在 Actions Summary 中说明原因。
 
+## 手动 Docker 构建
+
+Dockerfile 兼容直接手动构建，默认使用 amd64：
+
+```bash
+docker build -t promtail-mongodb:amd64 .
+```
+
+手动构建 arm64 时显式传入架构：
+
+```bash
+docker build --build-arg TARGETARCH=arm64 -t promtail-mongodb:arm64 .
+```
+
+GitHub Actions 会根据矩阵自动传入 `TARGETARCH=amd64` 或 `TARGETARCH=arm64`。
+
 ## 项目配置文件
 
 `.image-build.env` 是项目级默认配置。它使用简单的 `KEY=VALUE` 格式，支持 `#` 注释，适合直接复制到其他项目后修改。

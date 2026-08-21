@@ -1,4 +1,6 @@
-ARG TARGETARCH
+# Manual `docker build .` defaults to amd64. CI passes arm64 explicitly for
+# the native ARM runner.
+ARG TARGETARCH=amd64
 FROM registry.cn-shanghai.aliyuncs.com/jing-images/linux_${TARGETARCH}_alpine:3.20.3
 
 ARG TARGETARCH

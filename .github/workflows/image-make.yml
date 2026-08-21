@@ -287,7 +287,7 @@ jobs:
           PUSH_ALIYUN: ${{ needs.config.outputs.can_aliyun }}
         run: |
           set -euo pipefail
-          docker buildx build --platform "${{ matrix.platform }}" --file "${{ needs.config.outputs.dockerfile }}" --tag "$TARGET_IMAGE" --load "${{ needs.config.outputs.docker_context }}"
+          docker buildx build --platform "${{ matrix.platform }}" --build-arg TARGETARCH="${{ matrix.architecture }}" --file "${{ needs.config.outputs.dockerfile }}" --tag "$TARGET_IMAGE" --load "${{ needs.config.outputs.docker_context }}"
           if [[ "$PUSH_ALIYUN" == true ]]; then
             if [[ -z "$ALIYUN_IMAGE" || "$ALIYUN_IMAGE" == ":${TARGET_IMAGE##*:}" ]]; then
               image_name="${TARGET_IMAGE%:*}"
