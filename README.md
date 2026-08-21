@@ -6,6 +6,8 @@
 
 使用 `Actions → Image Make → Run workflow`，各功能可独立开关：
 
+推送到 `master` 分支时也会自动执行默认的 `build-and-release`：使用 `sha-<commit>` 作为镜像和 Release tag，推送主仓库，默认不推送阿里云且不通知 HAP。
+
 - `build_image`：是否执行 Dockerfile 构建。
 - `push_registry`：是否推送到主镜像仓库。
 - `push_aliyun`：是否同时推送到阿里云镜像仓库。

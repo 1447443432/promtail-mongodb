@@ -1,6 +1,8 @@
 name: Image Make
 
 on:
+  push:
+    branches: [master]
   workflow_dispatch:
     inputs:
       operation:
@@ -56,6 +58,16 @@ on:
         type: boolean
 
 env:
+  WORKFLOW_OPERATION: ${{ github.event_name == 'push' && 'build-and-release' || inputs.operation }}
+  WORKFLOW_TAG: ${{ github.event_name == 'push' && format('sha-{0}', github.sha) || inputs.tag }}
+  WORKFLOW_PLATFORMS: ${{ github.event_name == 'push' && 'linux/amd64,linux/arm64' || inputs.platforms }}
+  WORKFLOW_TARGET_IMAGE: ${{ github.event_name == 'push' && 'registry.cn-hangzhou.aliyuncs.com/hap-mdy/hap-promtail-vlogs-mongodb' || inputs.target_image }}
+  WORKFLOW_ALIYUN_IMAGE: ${{ github.event_name == 'push' && 'registry.cn-hangzhou.aliyuncs.com/hap-mdy/hap-promtail-vlogs-mongodb' || inputs.aliyun_image }}
+  WORKFLOW_BUILD_IMAGE: ${{ github.event_name == 'push' && 'true' || inputs.build_image }}
+  WORKFLOW_PUSH_REGISTRY: ${{ github.event_name == 'push' && 'true' || inputs.push_registry }}
+  WORKFLOW_PUSH_ALIYUN: ${{ github.event_name == 'push' && 'false' || inputs.push_aliyun }}
+  WORKFLOW_CREATE_RELEASE: ${{ github.event_name == 'push' && 'true' || inputs.create_release }}
+  WORKFLOW_NOTIFY_HAP: ${{ github.event_name == 'push' && 'false' || inputs.notify_hap }}
   REGISTRY: ${{ vars.REGISTRY }}
   REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
   REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
@@ -68,7 +80,7 @@ env:
 
 jobs:
   build:
-    if: ${{ inputs.build_image && inputs.operation != 'release' && (inputs.push_registry || inputs.push_aliyun) }}
+    if: ${{ env.WORKFLOW_BUILD_IMAGE == 'true' && env.WORKFLOW_OPERATION != 'release' && (env.WORKFLOW_PUSH_REGISTRY == 'true' || env.WORKFLOW_PUSH_ALIYUN == 'true') }}
     strategy:
       fail-fast: false
       matrix:
@@ -86,14 +98,14 @@ jobs:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
       - name: Login to registry
-        if: ${{ inputs.push_registry && env.REGISTRY != '' }}
+        if: ${{ env.WORKFLOW_PUSH_REGISTRY == 'true' && env.REGISTRY != '' }}
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ env.REGISTRY_USERNAME }}
           password: ${{ env.REGISTRY_PASSWORD }}
       - name: Login to Aliyun registry
-        if: ${{ inputs.push_aliyun }}
+        if: ${{ env.WORKFLOW_PUSH_ALIYUN == 'true' }}
         uses: docker/login-action@v3
         with:
           registry: ${{ env.ALIYUN_REGISTRY }}
@@ -101,10 +113,10 @@ jobs:
           password: ${{ env.ALIYUN_REGISTRY_PASSWORD || env.REGISTRY_PASSWORD }}
       - name: Build and push architecture image
         env:
-          TARGET_IMAGE: ${{ inputs.target_image }}:${{ inputs.tag }}-${{ matrix.architecture }}
-          ALIYUN_IMAGE: ${{ inputs.aliyun_image }}:${{ inputs.tag }}-${{ matrix.architecture }}
-          PUSH_REGISTRY: ${{ inputs.push_registry }}
-          PUSH_ALIYUN: ${{ inputs.push_aliyun }}
+          TARGET_IMAGE: ${{ env.WORKFLOW_TARGET_IMAGE }}:${{ env.WORKFLOW_TAG }}-${{ matrix.architecture }}
+          ALIYUN_IMAGE: ${{ env.WORKFLOW_ALIYUN_IMAGE }}:${{ env.WORKFLOW_TAG }}-${{ matrix.architecture }}
+          PUSH_REGISTRY: ${{ env.WORKFLOW_PUSH_REGISTRY }}
+          PUSH_ALIYUN: ${{ env.WORKFLOW_PUSH_ALIYUN }}
         run: |
           set -euo pipefail
           tags=()
@@ -115,7 +127,7 @@ jobs:
 
   package:
     needs: build
-    if: ${{ inputs.create_release && always() && (inputs.operation == 'release' || (inputs.operation == 'build-and-release' && (!inputs.build_image || needs.build.result == 'success'))) }}
+    if: ${{ env.WORKFLOW_CREATE_RELEASE == 'true' && always() && (env.WORKFLOW_OPERATION == 'release' || (env.WORKFLOW_OPERATION == 'build-and-release' && (env.WORKFLOW_BUILD_IMAGE != 'true' || needs.build.result == 'success'))) }}
     strategy:
       fail-fast: false
       matrix:
@@ -132,14 +144,14 @@ jobs:
     steps:
       - uses: docker/setup-buildx-action@v3
       - name: Login to registry
-        if: ${{ inputs.push_registry && env.REGISTRY != '' }}
+        if: ${{ env.WORKFLOW_PUSH_REGISTRY == 'true' && env.REGISTRY != '' }}
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ env.REGISTRY_USERNAME }}
           password: ${{ env.REGISTRY_PASSWORD }}
       - name: Login to Aliyun registry
-        if: ${{ inputs.push_aliyun }}
+        if: ${{ env.WORKFLOW_PUSH_ALIYUN == 'true' }}
         uses: docker/login-action@v3
         with:
           registry: ${{ env.ALIYUN_REGISTRY }}
@@ -147,13 +159,13 @@ jobs:
           password: ${{ env.ALIYUN_REGISTRY_PASSWORD || env.REGISTRY_PASSWORD }}
       - name: Package image
         env:
-          TARGET_IMAGE: ${{ inputs.target_image }}:${{ inputs.tag }}
-          ALIYUN_IMAGE: ${{ inputs.aliyun_image }}:${{ inputs.tag }}
+          TARGET_IMAGE: ${{ env.WORKFLOW_TARGET_IMAGE }}:${{ env.WORKFLOW_TAG }}
+          ALIYUN_IMAGE: ${{ env.WORKFLOW_ALIYUN_IMAGE }}:${{ env.WORKFLOW_TAG }}
           ARCHITECTURE: ${{ matrix.architecture }}
-          PLATFORMS: ${{ inputs.platforms }}
-          PUSH_REGISTRY: ${{ inputs.push_registry }}
-          PUSH_ALIYUN: ${{ inputs.push_aliyun }}
-          BUILD_IMAGE: ${{ inputs.build_image }}
+          PLATFORMS: ${{ env.WORKFLOW_PLATFORMS }}
+          PUSH_REGISTRY: ${{ env.WORKFLOW_PUSH_REGISTRY }}
+          PUSH_ALIYUN: ${{ env.WORKFLOW_PUSH_ALIYUN }}
+          BUILD_IMAGE: ${{ env.WORKFLOW_BUILD_IMAGE }}
         run: |
           set -euo pipefail
           [[ "$PLATFORMS" == *linux/amd64* && "$PLATFORMS" == *linux/arm64* ]] || {
@@ -175,7 +187,7 @@ jobs:
           docker pull --platform "linux/${ARCHITECTURE}" "$package_image"
           actual="$(docker image inspect "$package_image" --format '{{.Architecture}}')"
           test "$actual" = "$ARCHITECTURE"
-          archive="release-assets/hap-promtail-vlogs-mongodb_${{ inputs.tag }}_${ARCHITECTURE}.tar.gz"
+          archive="release-assets/hap-promtail-vlogs-mongodb_${{ env.WORKFLOW_TAG }}_${ARCHITECTURE}.tar.gz"
           docker save "$package_image" | gzip -9 > "$archive"
           sha256sum "$archive" > "$archive.sha256"
       - uses: actions/upload-artifact@v4
@@ -185,7 +197,7 @@ jobs:
           if-no-files-found: error
 
   release:
-    if: ${{ inputs.create_release && (inputs.operation == 'release' || inputs.operation == 'build-and-release') }}
+    if: ${{ env.WORKFLOW_CREATE_RELEASE == 'true' && (env.WORKFLOW_OPERATION == 'release' || env.WORKFLOW_OPERATION == 'build-and-release') }}
     needs: package
     runs-on: ubuntu-latest
     permissions:
@@ -198,11 +210,12 @@ jobs:
           merge-multiple: true
       - name: Create release manifest
         env:
-          TARGET_IMAGE: ${{ inputs.target_image }}:${{ inputs.tag }}
-          ALIYUN_IMAGE: ${{ inputs.aliyun_image }}:${{ inputs.tag }}
-          PLATFORMS: ${{ inputs.platforms }}
-          PUSH_REGISTRY: ${{ inputs.push_registry }}
-          PUSH_ALIYUN: ${{ inputs.push_aliyun }}
+          TARGET_IMAGE: ${{ env.WORKFLOW_TARGET_IMAGE }}:${{ env.WORKFLOW_TAG }}
+          ALIYUN_IMAGE: ${{ env.WORKFLOW_ALIYUN_IMAGE }}:${{ env.WORKFLOW_TAG }}
+          PLATFORMS: ${{ env.WORKFLOW_PLATFORMS }}
+          PUSH_REGISTRY: ${{ env.WORKFLOW_PUSH_REGISTRY }}
+          PUSH_ALIYUN: ${{ env.WORKFLOW_PUSH_ALIYUN }}
+          BUILD_IMAGE: ${{ env.WORKFLOW_BUILD_IMAGE }}
         run: |
           python3 - <<'PY'
           import glob, hashlib, json, os
@@ -225,12 +238,12 @@ jobs:
           PY
       - uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ inputs.tag }}
-          name: ${{ inputs.tag }}
+          tag_name: ${{ env.WORKFLOW_TAG }}
+          name: ${{ env.WORKFLOW_TAG }}
           generate_release_notes: true
           files: release-assets/*
       - name: Notify HAP Webhook
-        if: ${{ inputs.notify_hap && env.HAP_WEBHOOK_URL != '' }}
+        if: ${{ env.WORKFLOW_NOTIFY_HAP == 'true' && env.HAP_WEBHOOK_URL != '' }}
         run: |
           headers=(-H 'Content-Type: application/json')
           [[ -z "${HAP_WEBHOOK_APP_KEY:-}" ]] || headers+=(-H "AppKey: $HAP_WEBHOOK_APP_KEY")
