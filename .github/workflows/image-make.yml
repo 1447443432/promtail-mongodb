@@ -63,11 +63,11 @@ env:
   WORKFLOW_PLATFORMS: ${{ github.event_name == 'push' && 'linux/amd64,linux/arm64' || inputs.platforms }}
   WORKFLOW_TARGET_IMAGE: ${{ github.event_name == 'push' && 'registry.cn-hangzhou.aliyuncs.com/hap-mdy/hap-promtail-vlogs-mongodb' || inputs.target_image }}
   WORKFLOW_ALIYUN_IMAGE: ${{ github.event_name == 'push' && 'registry.cn-hangzhou.aliyuncs.com/hap-mdy/hap-promtail-vlogs-mongodb' || inputs.aliyun_image }}
-  WORKFLOW_BUILD_IMAGE: ${{ github.event_name == 'push' && vars.ENABLE_BUILD == 'true' || inputs.build_image }}
-  WORKFLOW_PUSH_REGISTRY: ${{ github.event_name == 'push' && vars.ENABLE_PUSH_REGISTRY == 'true' || inputs.push_registry }}
-  WORKFLOW_PUSH_ALIYUN: ${{ github.event_name == 'push' && vars.ENABLE_PUSH_ALIYUN == 'true' || inputs.push_aliyun }}
-  WORKFLOW_CREATE_RELEASE: ${{ github.event_name == 'push' && vars.ENABLE_CREATE_RELEASE == 'true' || inputs.create_release }}
-  WORKFLOW_NOTIFY_HAP: ${{ github.event_name == 'push' && vars.ENABLE_NOTIFY_HAP == 'true' || inputs.notify_hap }}
+  WORKFLOW_BUILD_IMAGE: ${{ github.event_name == 'push' && 'true' || inputs.build_image }}
+  WORKFLOW_PUSH_REGISTRY: ${{ github.event_name == 'push' && 'true' || inputs.push_registry }}
+  WORKFLOW_PUSH_ALIYUN: ${{ github.event_name == 'push' && 'true' || inputs.push_aliyun }}
+  WORKFLOW_CREATE_RELEASE: ${{ github.event_name == 'push' && 'true' || inputs.create_release }}
+  WORKFLOW_NOTIFY_HAP: ${{ github.event_name == 'push' && 'true' || inputs.notify_hap }}
   REGISTRY: ${{ vars.REGISTRY }}
   REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
   REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
@@ -79,8 +79,67 @@ env:
   ALIYUN_REGISTRY_PASSWORD: ${{ secrets.ALIYUN_REGISTRY_PASSWORD }}
 
 jobs:
+  config:
+    name: Check module configuration
+    runs-on: ubuntu-24.04
+    outputs:
+      can_build: ${{ steps.check.outputs.can_build }}
+      can_package: ${{ steps.check.outputs.can_package }}
+      can_release: ${{ steps.check.outputs.can_release }}
+    steps:
+      - id: check
+        env:
+          REGISTRY: ${{ env.REGISTRY }}
+          REGISTRY_USERNAME: ${{ env.REGISTRY_USERNAME }}
+          REGISTRY_PASSWORD: ${{ env.REGISTRY_PASSWORD }}
+          ALIYUN_REGISTRY: ${{ env.ALIYUN_REGISTRY }}
+          ALIYUN_USERNAME: ${{ env.ALIYUN_REGISTRY_USERNAME || env.REGISTRY_USERNAME }}
+          ALIYUN_PASSWORD: ${{ env.ALIYUN_REGISTRY_PASSWORD || env.REGISTRY_PASSWORD }}
+          TARGET_IMAGE: ${{ env.WORKFLOW_TARGET_IMAGE }}
+          ALIYUN_IMAGE: ${{ env.WORKFLOW_ALIYUN_IMAGE }}
+          PUSH_REGISTRY: ${{ env.WORKFLOW_PUSH_REGISTRY }}
+          PUSH_ALIYUN: ${{ env.WORKFLOW_PUSH_ALIYUN }}
+          BUILD_IMAGE: ${{ env.WORKFLOW_BUILD_IMAGE }}
+          CREATE_RELEASE: ${{ env.WORKFLOW_CREATE_RELEASE }}
+          HAP_WEBHOOK_URL: ${{ env.HAP_WEBHOOK_URL }}
+        run: |
+          python3 - <<'PY'
+          import os
+
+          def enabled(name):
+              return os.environ.get(name, '').lower() == 'true'
+
+          primary = enabled('PUSH_REGISTRY') and all(os.environ.get(k, '').strip() for k in ('REGISTRY', 'REGISTRY_USERNAME', 'REGISTRY_PASSWORD', 'TARGET_IMAGE'))
+          aliyun = enabled('PUSH_ALIYUN') and all(os.environ.get(k, '').strip() for k in ('ALIYUN_REGISTRY', 'ALIYUN_USERNAME', 'ALIYUN_PASSWORD', 'ALIYUN_IMAGE'))
+          source = primary or aliyun
+          can_build = enabled('BUILD_IMAGE') and source
+          can_package = enabled('CREATE_RELEASE') and source
+          can_release = can_package
+          reasons = []
+          if enabled('PUSH_REGISTRY') and not primary:
+              reasons.append('Primary registry skipped: REGISTRY, credentials, or target_image is missing.')
+          if enabled('PUSH_ALIYUN') and not aliyun:
+              reasons.append('Aliyun registry skipped: ALIYUN_REGISTRY, credentials, or aliyun_image is missing.')
+          if not source:
+              reasons.append('Build/package skipped: no usable image registry is configured.')
+          if enabled('CREATE_RELEASE') and source:
+              reasons.append('GitHub Release: enabled.')
+          if os.environ.get('HAP_WEBHOOK_URL', '').strip():
+              reasons.append('HAP Webhook: configured and will be notified after Release.')
+          else:
+              reasons.append('HAP Webhook skipped: HAP_WEBHOOK_URL is missing.')
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as f:
+              f.write('## Module configuration\n\n')
+              f.write('\n'.join(f'- {item}' for item in reasons) + '\n')
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as f:
+              f.write(f'can_build={str(can_build).lower()}\n')
+              f.write(f'can_package={str(can_package).lower()}\n')
+              f.write(f'can_release={str(can_release).lower()}\n')
+          PY
+
   build:
-    if: ${{ (github.event_name == 'push' && vars.ENABLE_BUILD == 'true' || inputs.build_image == true) && (github.event_name == 'push' || inputs.operation != 'release') && ((github.event_name == 'push' && (vars.ENABLE_PUSH_REGISTRY == 'true' || vars.ENABLE_PUSH_ALIYUN == 'true')) || inputs.push_registry == true || inputs.push_aliyun == true) }}
+    needs: config
+    if: ${{ needs.config.outputs.can_build == 'true' && (github.event_name == 'push' || inputs.operation != 'release') }}
     strategy:
       fail-fast: false
       matrix:
@@ -126,8 +185,8 @@ jobs:
           docker buildx build --platform "${{ matrix.platform }}" "${tags[@]}" --push .
 
   package:
-    needs: build
-    if: ${{ always() && ((github.event_name == 'push' && vars.ENABLE_CREATE_RELEASE == 'true' && vars.ENABLE_BUILD == 'true' && needs.build.result == 'success') || (github.event_name != 'push' && inputs.create_release == true && (inputs.operation == 'release' || (inputs.operation == 'build-and-release' && (!inputs.build_image || needs.build.result == 'success'))))) }}
+    needs: [config, build]
+    if: ${{ always() && needs.config.outputs.can_package == 'true' && (github.event_name == 'push' && needs.build.result == 'success' || github.event_name != 'push' && (inputs.operation == 'release' || needs.build.result == 'success')) }}
     strategy:
       fail-fast: false
       matrix:
@@ -197,8 +256,8 @@ jobs:
           if-no-files-found: error
 
   release:
-    if: ${{ (github.event_name == 'push' && vars.ENABLE_CREATE_RELEASE == 'true') || (github.event_name != 'push' && inputs.create_release == true && (inputs.operation == 'release' || inputs.operation == 'build-and-release')) }}
-    needs: package
+    if: ${{ always() && needs.config.outputs.can_release == 'true' && needs.package.result == 'success' }}
+    needs: [config, package]
     runs-on: ubuntu-latest
     permissions:
       contents: write

@@ -6,7 +6,7 @@
 
 使用 `Actions → Image Make → Run workflow`，各功能可独立开关：
 
-推送到 `master` 分支时只有配置开关为 `true` 才会执行对应模块；未配置时全部关闭。自动触发使用 `sha-<commit>` 作为镜像和 Release tag。
+推送到 `master` 分支时模块默认开启，但每个模块会先检查自己的地址、账号和密码；配置不完整时只跳过对应模块，并在 Actions Summary 中显示原因。自动触发使用 `sha-<commit>` 作为镜像和 Release tag。
 
 - `build_image`：是否执行 Dockerfile 构建。
 - `push_registry`：是否推送到主镜像仓库。
@@ -34,6 +34,5 @@ registry.cn-hangzhou.aliyuncs.com/hap-mdy/hap-promtail-vlogs-mongodb:<tag>
 - 阿里云：可选 Variable `ALIYUN_REGISTRY`；Secrets `ALIYUN_REGISTRY_USERNAME`、`ALIYUN_REGISTRY_PASSWORD`
 - HAP：Secret `HAP_WEBHOOK_URL`；如开启应用授权，再配置 `HAP_WEBHOOK_APP_KEY`、`HAP_WEBHOOK_SIGN`
 
-自动提交触发开关（Repository Variables，值为字符串 `true` 才启用）：`ENABLE_BUILD`、`ENABLE_PUSH_REGISTRY`、`ENABLE_PUSH_ALIYUN`、`ENABLE_CREATE_RELEASE`、`ENABLE_NOTIFY_HAP`。
 
 阿里云账号未单独配置时，会回退使用主仓库账号。`notify_hap=true` 时，Webhook 收到的 `release-manifest.json` 包含已推送镜像、架构、Release 下载地址和 SHA256。
