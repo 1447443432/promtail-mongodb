@@ -12,7 +12,9 @@ if [[ "$PACKAGE_MODE" == release ]]; then
   actual="$(docker image inspect "$package_image" --format '{{.Architecture}}')"
   test "$actual" = "$ARCHITECTURE"
   mkdir -p release-assets
-  archive="release-assets/${RELEASE_NAME}_${RELEASE_TAG}_${ARCHITECTURE}.tar.gz"
+  image_name="${TARGET_IMAGE%:*}"
+  image_name="${image_name##*/}"
+  archive="release-assets/${image_name}_${RELEASE_TAG}.tar.gz"
   docker save "$package_image" | gzip -9 > "$archive"
   sha256sum "$archive" > "$archive.sha256"
 fi
@@ -27,5 +29,7 @@ fi
     echo "- **Source:** build job artifact \`release-$ARCHITECTURE\`"
   fi
   echo "- **Platform check:** \`linux/$ARCHITECTURE\`"
-  echo "- **Archive:** \`${RELEASE_NAME}_${RELEASE_TAG}_${ARCHITECTURE}.tar.gz\`"
+  image_name="${TARGET_IMAGE%:*}"
+  image_name="${image_name##*/}"
+  echo "- **Archive:** \`${image_name}_${RELEASE_TAG}.tar.gz\`"
 } >> "$GITHUB_STEP_SUMMARY"

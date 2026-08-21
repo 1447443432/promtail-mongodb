@@ -27,9 +27,12 @@ for architecture, image in aliyun.items():
 base = f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/releases/download/{tag}"
 images = []
 for path in sorted(glob.glob("release-assets/*.tar.gz")):
-    architecture = path.rsplit("_", 1)[1].removesuffix(".tar.gz")
-    image = aliyun[architecture] if os.environ["PUSH_ALIYUN"] == "true" else primary[architecture]
     archive = os.path.basename(path)
+    image_name = archive.removesuffix(f"_{tag}.tar.gz")
+    architecture = next((item for item in ("amd64", "arm64") if image_name == primary[item].rsplit("/", 1)[-1].rsplit(":", 1)[0]), "")
+    if not architecture:
+        raise RuntimeError(f"cannot determine architecture from archive: {archive}")
+    image = aliyun[architecture] if os.environ["PUSH_ALIYUN"] == "true" else primary[architecture]
     images.append({
         "architecture": architecture,
         "platform": f"linux/{architecture}",

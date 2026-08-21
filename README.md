@@ -129,4 +129,4 @@ ENABLE_HAP_WEBHOOK
 .github/image-make/release.py  # Release manifest 和 Summary
 ```
 
-`RELEASE_NAME` 控制 Release 压缩包和 manifest 的项目名称。复制这套 Workflow 到其他项目时，只需要修改 `.image-build.env`、Dockerfile 和必要的镜像配置，不需要把 CI 脚本混入项目业务 `scripts/`。
+`RELEASE_NAME` 写入 Release manifest。压缩包名称会根据镜像最后一段和 tag 自动生成，例如 `hap-promtail-vlogs-mongodb-amd64_1.0.0.tar.gz`。复制这套 Workflow 到其他项目时，只需要修改 `.image-build.env`、Dockerfile 和必要的镜像配置，不需要把 CI 脚本混入项目业务 `scripts/`。
