@@ -26,10 +26,15 @@ on:
         required: true
         default: true
         type: boolean
-      target_image:
-        description: Full target image name without tag
+      target_image_amd64:
+        description: Primary amd64 image name without tag
         required: true
-        default: registry.cn-hangzhou.aliyuncs.com/hap-mdy/hap-promtail-vlogs-mongodb
+        default: registry.cn-hangzhou.aliyuncs.com/hap-mdy/hap-promtail-vlogs-mongodb-amd64
+        type: string
+      target_image_arm64:
+        description: Primary arm64 image name without tag
+        required: true
+        default: registry.cn-hangzhou.aliyuncs.com/hap-mdy/hap-promtail-vlogs-mongodb-arm64
         type: string
       push_registry:
         description: Push image to the primary registry
@@ -41,10 +46,15 @@ on:
         required: true
         default: false
         type: boolean
-      aliyun_image:
-        description: Aliyun image name without tag
+      aliyun_image_amd64:
+        description: Aliyun amd64 image name without tag
         required: true
-        default: registry.cn-hangzhou.aliyuncs.com/hap-mdy/hap-promtail-vlogs-mongodb
+        default: ''
+        type: string
+      aliyun_image_arm64:
+        description: Aliyun arm64 image name without tag
+        required: true
+        default: ''
         type: string
       create_release:
         description: Create GitHub Release packages
@@ -61,8 +71,10 @@ env:
   WORKFLOW_OPERATION: ${{ github.event_name == 'push' && 'build-and-release' || inputs.operation }}
   WORKFLOW_TAG: ${{ github.event_name == 'push' && format('sha-{0}', github.sha) || inputs.tag }}
   WORKFLOW_PLATFORMS: ${{ github.event_name == 'push' && 'linux/amd64,linux/arm64' || inputs.platforms }}
-  WORKFLOW_TARGET_IMAGE: ${{ github.event_name == 'push' && 'registry.cn-hangzhou.aliyuncs.com/hap-mdy/hap-promtail-vlogs-mongodb' || inputs.target_image }}
-  WORKFLOW_ALIYUN_IMAGE: ${{ github.event_name == 'push' && 'registry.cn-hangzhou.aliyuncs.com/hap-mdy/hap-promtail-vlogs-mongodb' || inputs.aliyun_image }}
+  WORKFLOW_TARGET_IMAGE_AMD64: ${{ github.event_name == 'push' && 'registry.cn-hangzhou.aliyuncs.com/hap-mdy/hap-promtail-vlogs-mongodb-amd64' || inputs.target_image_amd64 }}
+  WORKFLOW_TARGET_IMAGE_ARM64: ${{ github.event_name == 'push' && 'registry.cn-hangzhou.aliyuncs.com/hap-mdy/hap-promtail-vlogs-mongodb-arm64' || inputs.target_image_arm64 }}
+  WORKFLOW_ALIYUN_IMAGE_AMD64: ${{ github.event_name == 'push' && '' || inputs.aliyun_image_amd64 }}
+  WORKFLOW_ALIYUN_IMAGE_ARM64: ${{ github.event_name == 'push' && '' || inputs.aliyun_image_arm64 }}
   WORKFLOW_BUILD_IMAGE: ${{ github.event_name == 'push' && 'true' || inputs.build_image }}
   WORKFLOW_PUSH_REGISTRY: ${{ github.event_name == 'push' && 'true' || inputs.push_registry }}
   WORKFLOW_PUSH_ALIYUN: ${{ github.event_name == 'push' && 'true' || inputs.push_aliyun }}
@@ -83,6 +95,8 @@ jobs:
     name: Check module configuration
     runs-on: ubuntu-24.04
     outputs:
+      can_primary: ${{ steps.check.outputs.can_primary }}
+      can_aliyun: ${{ steps.check.outputs.can_aliyun }}
       can_build: ${{ steps.check.outputs.can_build }}
       can_package: ${{ steps.check.outputs.can_package }}
       can_release: ${{ steps.check.outputs.can_release }}
@@ -95,8 +109,10 @@ jobs:
           ALIYUN_REGISTRY: ${{ env.ALIYUN_REGISTRY }}
           ALIYUN_USERNAME: ${{ env.ALIYUN_REGISTRY_USERNAME || env.REGISTRY_USERNAME }}
           ALIYUN_PASSWORD: ${{ env.ALIYUN_REGISTRY_PASSWORD || env.REGISTRY_PASSWORD }}
-          TARGET_IMAGE: ${{ env.WORKFLOW_TARGET_IMAGE }}
-          ALIYUN_IMAGE: ${{ env.WORKFLOW_ALIYUN_IMAGE }}
+          TARGET_IMAGE_AMD64: ${{ env.WORKFLOW_TARGET_IMAGE_AMD64 }}
+          TARGET_IMAGE_ARM64: ${{ env.WORKFLOW_TARGET_IMAGE_ARM64 }}
+          ALIYUN_IMAGE_AMD64: ${{ env.WORKFLOW_ALIYUN_IMAGE_AMD64 }}
+          ALIYUN_IMAGE_ARM64: ${{ env.WORKFLOW_ALIYUN_IMAGE_ARM64 }}
           PUSH_REGISTRY: ${{ env.WORKFLOW_PUSH_REGISTRY }}
           PUSH_ALIYUN: ${{ env.WORKFLOW_PUSH_ALIYUN }}
           BUILD_IMAGE: ${{ env.WORKFLOW_BUILD_IMAGE }}
@@ -109,8 +125,8 @@ jobs:
           def enabled(name):
               return os.environ.get(name, '').lower() == 'true'
 
-          primary = enabled('PUSH_REGISTRY') and all(os.environ.get(k, '').strip() for k in ('REGISTRY', 'REGISTRY_USERNAME', 'REGISTRY_PASSWORD', 'TARGET_IMAGE'))
-          aliyun = enabled('PUSH_ALIYUN') and all(os.environ.get(k, '').strip() for k in ('ALIYUN_REGISTRY', 'ALIYUN_USERNAME', 'ALIYUN_PASSWORD', 'ALIYUN_IMAGE'))
+          primary = enabled('PUSH_REGISTRY') and all(os.environ.get(k, '').strip() for k in ('REGISTRY', 'REGISTRY_USERNAME', 'REGISTRY_PASSWORD', 'TARGET_IMAGE_AMD64', 'TARGET_IMAGE_ARM64'))
+          aliyun = enabled('PUSH_ALIYUN') and all(os.environ.get(k, '').strip() for k in ('ALIYUN_REGISTRY', 'ALIYUN_USERNAME', 'ALIYUN_PASSWORD', 'ALIYUN_IMAGE_AMD64', 'ALIYUN_IMAGE_ARM64'))
           source = primary or aliyun
           can_build = enabled('BUILD_IMAGE') and source
           can_package = enabled('CREATE_RELEASE') and source
@@ -132,6 +148,8 @@ jobs:
               f.write('## Module configuration\n\n')
               f.write('\n'.join(f'- {item}' for item in reasons) + '\n')
           with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as f:
+              f.write(f'can_primary={str(primary).lower()}\n')
+              f.write(f'can_aliyun={str(aliyun).lower()}\n')
               f.write(f'can_build={str(can_build).lower()}\n')
               f.write(f'can_package={str(can_package).lower()}\n')
               f.write(f'can_release={str(can_release).lower()}\n')
@@ -157,14 +175,14 @@ jobs:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
       - name: Login to registry
-        if: ${{ env.WORKFLOW_PUSH_REGISTRY == 'true' && env.REGISTRY != '' }}
+        if: ${{ needs.config.outputs.can_primary == 'true' }}
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ env.REGISTRY_USERNAME }}
           password: ${{ env.REGISTRY_PASSWORD }}
       - name: Login to Aliyun registry
-        if: ${{ env.WORKFLOW_PUSH_ALIYUN == 'true' }}
+        if: ${{ needs.config.outputs.can_aliyun == 'true' }}
         uses: docker/login-action@v3
         with:
           registry: ${{ env.ALIYUN_REGISTRY }}
@@ -172,10 +190,10 @@ jobs:
           password: ${{ env.ALIYUN_REGISTRY_PASSWORD || env.REGISTRY_PASSWORD }}
       - name: Build and push architecture image
         env:
-          TARGET_IMAGE: ${{ env.WORKFLOW_TARGET_IMAGE }}:${{ env.WORKFLOW_TAG }}-${{ matrix.architecture }}
-          ALIYUN_IMAGE: ${{ env.WORKFLOW_ALIYUN_IMAGE }}:${{ env.WORKFLOW_TAG }}-${{ matrix.architecture }}
-          PUSH_REGISTRY: ${{ env.WORKFLOW_PUSH_REGISTRY }}
-          PUSH_ALIYUN: ${{ env.WORKFLOW_PUSH_ALIYUN }}
+          TARGET_IMAGE: ${{ matrix.architecture == 'amd64' && env.WORKFLOW_TARGET_IMAGE_AMD64 || env.WORKFLOW_TARGET_IMAGE_ARM64 }}:${{ env.WORKFLOW_TAG }}
+          ALIYUN_IMAGE: ${{ matrix.architecture == 'amd64' && env.WORKFLOW_ALIYUN_IMAGE_AMD64 || env.WORKFLOW_ALIYUN_IMAGE_ARM64 }}:${{ env.WORKFLOW_TAG }}
+          PUSH_REGISTRY: ${{ needs.config.outputs.can_primary }}
+          PUSH_ALIYUN: ${{ needs.config.outputs.can_aliyun }}
         run: |
           set -euo pipefail
           tags=()
@@ -203,14 +221,14 @@ jobs:
     steps:
       - uses: docker/setup-buildx-action@v3
       - name: Login to registry
-        if: ${{ env.WORKFLOW_PUSH_REGISTRY == 'true' && env.REGISTRY != '' }}
+        if: ${{ needs.config.outputs.can_primary == 'true' }}
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ env.REGISTRY_USERNAME }}
           password: ${{ env.REGISTRY_PASSWORD }}
       - name: Login to Aliyun registry
-        if: ${{ env.WORKFLOW_PUSH_ALIYUN == 'true' }}
+        if: ${{ needs.config.outputs.can_aliyun == 'true' }}
         uses: docker/login-action@v3
         with:
           registry: ${{ env.ALIYUN_REGISTRY }}
@@ -218,12 +236,12 @@ jobs:
           password: ${{ env.ALIYUN_REGISTRY_PASSWORD || env.REGISTRY_PASSWORD }}
       - name: Package image
         env:
-          TARGET_IMAGE: ${{ env.WORKFLOW_TARGET_IMAGE }}:${{ env.WORKFLOW_TAG }}
-          ALIYUN_IMAGE: ${{ env.WORKFLOW_ALIYUN_IMAGE }}:${{ env.WORKFLOW_TAG }}
+          TARGET_IMAGE: ${{ matrix.architecture == 'amd64' && env.WORKFLOW_TARGET_IMAGE_AMD64 || env.WORKFLOW_TARGET_IMAGE_ARM64 }}:${{ env.WORKFLOW_TAG }}
+          ALIYUN_IMAGE: ${{ matrix.architecture == 'amd64' && env.WORKFLOW_ALIYUN_IMAGE_AMD64 || env.WORKFLOW_ALIYUN_IMAGE_ARM64 }}:${{ env.WORKFLOW_TAG }}
           ARCHITECTURE: ${{ matrix.architecture }}
           PLATFORMS: ${{ env.WORKFLOW_PLATFORMS }}
-          PUSH_REGISTRY: ${{ env.WORKFLOW_PUSH_REGISTRY }}
-          PUSH_ALIYUN: ${{ env.WORKFLOW_PUSH_ALIYUN }}
+          PUSH_REGISTRY: ${{ needs.config.outputs.can_primary }}
+          PUSH_ALIYUN: ${{ needs.config.outputs.can_aliyun }}
           BUILD_IMAGE: ${{ env.WORKFLOW_BUILD_IMAGE }}
         run: |
           set -euo pipefail
@@ -238,9 +256,6 @@ jobs:
           else
             echo 'enable push_registry or push_aliyun to create a release' >&2
             exit 1
-          fi
-          if [[ "$BUILD_IMAGE" == true ]]; then
-            package_image="${package_image%:*}:${package_image##*:}-${ARCHITECTURE}"
           fi
           mkdir -p release-assets
           docker pull --platform "linux/${ARCHITECTURE}" "$package_image"
@@ -269,31 +284,33 @@ jobs:
           merge-multiple: true
       - name: Create release manifest
         env:
-          TARGET_IMAGE: ${{ env.WORKFLOW_TARGET_IMAGE }}:${{ env.WORKFLOW_TAG }}
-          ALIYUN_IMAGE: ${{ env.WORKFLOW_ALIYUN_IMAGE }}:${{ env.WORKFLOW_TAG }}
+          TARGET_IMAGE_AMD64: ${{ env.WORKFLOW_TARGET_IMAGE_AMD64 }}:${{ env.WORKFLOW_TAG }}
+          TARGET_IMAGE_ARM64: ${{ env.WORKFLOW_TARGET_IMAGE_ARM64 }}:${{ env.WORKFLOW_TAG }}
+          ALIYUN_IMAGE_AMD64: ${{ env.WORKFLOW_ALIYUN_IMAGE_AMD64 }}:${{ env.WORKFLOW_TAG }}
+          ALIYUN_IMAGE_ARM64: ${{ env.WORKFLOW_ALIYUN_IMAGE_ARM64 }}:${{ env.WORKFLOW_TAG }}
           PLATFORMS: ${{ env.WORKFLOW_PLATFORMS }}
-          PUSH_REGISTRY: ${{ env.WORKFLOW_PUSH_REGISTRY }}
-          PUSH_ALIYUN: ${{ env.WORKFLOW_PUSH_ALIYUN }}
+          PUSH_REGISTRY: ${{ needs.config.outputs.can_primary }}
+          PUSH_ALIYUN: ${{ needs.config.outputs.can_aliyun }}
           BUILD_IMAGE: ${{ env.WORKFLOW_BUILD_IMAGE }}
+          RELEASE_TAG: ${{ env.WORKFLOW_TAG }}
         run: |
           python3 - <<'PY'
           import glob, hashlib, json, os
           files = [p for p in glob.glob('release-assets/*.tar.gz')]
           images = []
-          base_image = os.environ['TARGET_IMAGE'] if os.environ['PUSH_REGISTRY'] == 'true' else os.environ['ALIYUN_IMAGE']
+          primary = {'amd64': os.environ['TARGET_IMAGE_AMD64'], 'arm64': os.environ['TARGET_IMAGE_ARM64']}
+          aliyun = {'amd64': os.environ['ALIYUN_IMAGE_AMD64'], 'arm64': os.environ['ALIYUN_IMAGE_ARM64']}
           for path in sorted(files):
               arch = path.rsplit('_', 1)[1].removesuffix('.tar.gz')
-              image = base_image
-              if os.environ['BUILD_IMAGE'] == 'true':
-                  image = f"{image.rsplit(':', 1)[0]}:{image.rsplit(':', 1)[1]}-{arch}"
+              image = primary[arch] if os.environ['PUSH_REGISTRY'] == 'true' else aliyun[arch]
               images.append({'architecture': arch, 'platform': f'linux/{arch}', 'image': image, 'archive': os.path.basename(path), 'sha256': hashlib.sha256(open(path, 'rb').read()).hexdigest()})
-          base = f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/releases/download/{os.environ['TARGET_IMAGE'].rsplit(':', 1)[1]}"
+          base = f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/releases/download/{os.environ['RELEASE_TAG']}"
           for item in images:
               item['download_url'] = f"{base}/{item['archive']}"
           published = []
-          if os.environ['PUSH_REGISTRY'] == 'true': published.append(os.environ['TARGET_IMAGE'] + ('-amd64/-arm64' if os.environ['BUILD_IMAGE'] == 'true' else ''))
-          if os.environ['PUSH_ALIYUN'] == 'true': published.append(os.environ['ALIYUN_IMAGE'] + ('-amd64/-arm64' if os.environ['BUILD_IMAGE'] == 'true' else ''))
-          json.dump({'event': 'image_release_ready', 'release_tag': os.environ['TARGET_IMAGE'].rsplit(':', 1)[1], 'image': published[0] if published else '', 'published_images': published, 'platforms': os.environ['PLATFORMS'].split(','), 'images': images}, open('release-assets/release-manifest.json', 'w'), indent=2)
+          if os.environ['PUSH_REGISTRY'] == 'true': published.extend(primary.values())
+          if os.environ['PUSH_ALIYUN'] == 'true': published.extend(aliyun.values())
+          json.dump({'event': 'image_release_ready', 'release_tag': os.environ['RELEASE_TAG'], 'image': images[0]['image'] if images else '', 'published_images': published, 'platforms': os.environ['PLATFORMS'].split(','), 'images': images}, open('release-assets/release-manifest.json', 'w'), indent=2)
           PY
       - uses: softprops/action-gh-release@v2
         with:

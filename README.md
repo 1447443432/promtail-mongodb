@@ -20,13 +20,14 @@
 - `release`：使用已有镜像生成 Release 包。
 - `build-and-release`：构建、推送、打包并创建 Release。
 
-默认镜像为：
+主仓库默认镜像为：
 
 ```text
-registry.cn-hangzhou.aliyuncs.com/hap-mdy/hap-promtail-vlogs-mongodb:<tag>
+registry.cn-hangzhou.aliyuncs.com/hap-mdy/hap-promtail-vlogs-mongodb-amd64:1.0.0
+registry.cn-hangzhou.aliyuncs.com/hap-mdy/hap-promtail-vlogs-mongodb-arm64:1.0.0
 ```
 
-开启 `push_aliyun` 后，工作流会在同一个矩阵 Workflow 中额外推送 `aliyun_image:<tag>-amd64` 和 `aliyun_image:<tag>-arm64`，不会重复构建。
+tag 默认是 `1.0.0`，可在 Workflow 输入中修改；两个架构镜像地址也可以分别修改。开启 `push_aliyun` 后，需要分别填写阿里云 amd64/arm64 镜像地址。
 
 需要在仓库 `Settings → Secrets and variables → Actions` 配置：
 
