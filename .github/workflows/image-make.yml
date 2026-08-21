@@ -46,6 +46,11 @@ on:
         required: true
         default: false
         type: boolean
+      aliyun_namespace:
+        description: Aliyun namespace used to derive the target image
+        required: true
+        default: hap-mdy
+        type: string
       aliyun_image_amd64:
         description: Aliyun amd64 image name without tag
         required: true
@@ -75,6 +80,7 @@ env:
   WORKFLOW_TARGET_IMAGE_ARM64: ${{ github.event_name == 'push' && 'registry.cn-hangzhou.aliyuncs.com/hap-mdy/hap-promtail-vlogs-mongodb-arm64' || inputs.target_image_arm64 }}
   WORKFLOW_ALIYUN_IMAGE_AMD64: ${{ github.event_name == 'push' && '' || inputs.aliyun_image_amd64 }}
   WORKFLOW_ALIYUN_IMAGE_ARM64: ${{ github.event_name == 'push' && '' || inputs.aliyun_image_arm64 }}
+  WORKFLOW_ALIYUN_NAMESPACE: ${{ github.event_name == 'push' && 'hap-mdy' || inputs.aliyun_namespace }}
   WORKFLOW_BUILD_IMAGE: ${{ github.event_name == 'push' && 'true' || inputs.build_image }}
   WORKFLOW_PUSH_REGISTRY: ${{ github.event_name == 'push' && 'true' || inputs.push_registry }}
   WORKFLOW_PUSH_ALIYUN: ${{ github.event_name == 'push' && 'true' || inputs.push_aliyun }}
@@ -107,6 +113,7 @@ jobs:
           ALIYUN_REGISTRY: ${{ env.ALIYUN_REGISTRY }}
           ALIYUN_USERNAME: ${{ env.ALIYUN_REGISTRY_USERNAME || env.REGISTRY_USERNAME }}
           ALIYUN_PASSWORD: ${{ env.ALIYUN_REGISTRY_PASSWORD || env.REGISTRY_PASSWORD }}
+          ALIYUN_NAMESPACE: ${{ env.WORKFLOW_ALIYUN_NAMESPACE }}
           TARGET_IMAGE_AMD64: ${{ env.WORKFLOW_TARGET_IMAGE_AMD64 }}
           TARGET_IMAGE_ARM64: ${{ env.WORKFLOW_TARGET_IMAGE_ARM64 }}
           ALIYUN_IMAGE_AMD64: ${{ env.WORKFLOW_ALIYUN_IMAGE_AMD64 }}
@@ -125,14 +132,14 @@ jobs:
               return os.environ.get(name, '').lower() == 'true'
 
           primary = all(os.environ.get(k, '').strip() for k in ('TARGET_IMAGE_AMD64', 'TARGET_IMAGE_ARM64'))
-          aliyun = enabled('PUSH_ALIYUN') and all(os.environ.get(k, '').strip() for k in ('ALIYUN_REGISTRY', 'ALIYUN_USERNAME', 'ALIYUN_PASSWORD', 'ALIYUN_IMAGE_AMD64', 'ALIYUN_IMAGE_ARM64'))
+          aliyun = enabled('PUSH_ALIYUN') and all(os.environ.get(k, '').strip() for k in ('ALIYUN_REGISTRY', 'ALIYUN_NAMESPACE', 'ALIYUN_USERNAME', 'ALIYUN_PASSWORD', 'TARGET_IMAGE_AMD64', 'TARGET_IMAGE_ARM64'))
           source = primary or aliyun
           can_build = enabled('BUILD_IMAGE') and source
           can_package = enabled('CREATE_RELEASE') and (aliyun if os.environ.get('OPERATION') == 'release' else can_build)
           can_release = can_package
           reasons = []
           primary_missing = [k for k in ('TARGET_IMAGE_AMD64', 'TARGET_IMAGE_ARM64') if not os.environ.get(k, '').strip()]
-          aliyun_missing = [k for k in ('ALIYUN_REGISTRY', 'ALIYUN_USERNAME', 'ALIYUN_PASSWORD', 'ALIYUN_IMAGE_AMD64', 'ALIYUN_IMAGE_ARM64') if not os.environ.get(k, '').strip()]
+          aliyun_missing = [k for k in ('ALIYUN_REGISTRY', 'ALIYUN_NAMESPACE', 'ALIYUN_USERNAME', 'ALIYUN_PASSWORD') if not os.environ.get(k, '').strip()]
           if enabled('PUSH_REGISTRY') and not primary:
               reasons.append('Local build skipped; missing: ' + ', '.join(primary_missing))
           if enabled('PUSH_ALIYUN') and not aliyun:
@@ -186,11 +193,18 @@ jobs:
         env:
           TARGET_IMAGE: ${{ matrix.architecture == 'amd64' && env.WORKFLOW_TARGET_IMAGE_AMD64 || env.WORKFLOW_TARGET_IMAGE_ARM64 }}:${{ env.WORKFLOW_TAG }}
           ALIYUN_IMAGE: ${{ matrix.architecture == 'amd64' && env.WORKFLOW_ALIYUN_IMAGE_AMD64 || env.WORKFLOW_ALIYUN_IMAGE_ARM64 }}:${{ env.WORKFLOW_TAG }}
+          ALIYUN_REGISTRY: ${{ env.ALIYUN_REGISTRY }}
+          ALIYUN_NAMESPACE: ${{ env.WORKFLOW_ALIYUN_NAMESPACE }}
           PUSH_ALIYUN: ${{ needs.config.outputs.can_aliyun }}
         run: |
           set -euo pipefail
           docker buildx build --platform "${{ matrix.platform }}" --tag "$TARGET_IMAGE" --load .
           if [[ "$PUSH_ALIYUN" == true ]]; then
+            if [[ -z "$ALIYUN_IMAGE" || "$ALIYUN_IMAGE" == ":${TARGET_IMAGE##*:}" ]]; then
+              image_name="${TARGET_IMAGE%:*}"
+              image_name="${image_name##*/}"
+              ALIYUN_IMAGE="${ALIYUN_REGISTRY}/${ALIYUN_NAMESPACE}/${image_name}:${TARGET_IMAGE##*:}"
+            fi
             docker tag "$TARGET_IMAGE" "$ALIYUN_IMAGE"
             docker push "$ALIYUN_IMAGE"
           fi
@@ -242,6 +256,8 @@ jobs:
         env:
           TARGET_IMAGE: ${{ matrix.architecture == 'amd64' && env.WORKFLOW_TARGET_IMAGE_AMD64 || env.WORKFLOW_TARGET_IMAGE_ARM64 }}:${{ env.WORKFLOW_TAG }}
           ALIYUN_IMAGE: ${{ matrix.architecture == 'amd64' && env.WORKFLOW_ALIYUN_IMAGE_AMD64 || env.WORKFLOW_ALIYUN_IMAGE_ARM64 }}:${{ env.WORKFLOW_TAG }}
+          ALIYUN_REGISTRY: ${{ env.ALIYUN_REGISTRY }}
+          ALIYUN_NAMESPACE: ${{ env.WORKFLOW_ALIYUN_NAMESPACE }}
           ARCHITECTURE: ${{ matrix.architecture }}
           PLATFORMS: ${{ env.WORKFLOW_PLATFORMS }}
           PUSH_ALIYUN: ${{ needs.config.outputs.can_aliyun }}
@@ -253,6 +269,11 @@ jobs:
             exit 1
           }
           [[ "$PUSH_ALIYUN" == true ]] || { echo 'Aliyun image is required for release-only mode' >&2; exit 1; }
+          if [[ -z "$ALIYUN_IMAGE" || "$ALIYUN_IMAGE" == ":${TARGET_IMAGE##*:}" ]]; then
+            image_name="${TARGET_IMAGE%:*}"
+            image_name="${image_name##*/}"
+            ALIYUN_IMAGE="${ALIYUN_REGISTRY}/${ALIYUN_NAMESPACE}/${image_name}:${TARGET_IMAGE##*:}"
+          fi
           package_image="$ALIYUN_IMAGE"
           mkdir -p release-assets
           docker pull --platform "linux/${ARCHITECTURE}" "$package_image"
@@ -285,6 +306,8 @@ jobs:
           TARGET_IMAGE_ARM64: ${{ env.WORKFLOW_TARGET_IMAGE_ARM64 }}:${{ env.WORKFLOW_TAG }}
           ALIYUN_IMAGE_AMD64: ${{ env.WORKFLOW_ALIYUN_IMAGE_AMD64 }}:${{ env.WORKFLOW_TAG }}
           ALIYUN_IMAGE_ARM64: ${{ env.WORKFLOW_ALIYUN_IMAGE_ARM64 }}:${{ env.WORKFLOW_TAG }}
+          ALIYUN_REGISTRY: ${{ env.ALIYUN_REGISTRY }}
+          ALIYUN_NAMESPACE: ${{ env.WORKFLOW_ALIYUN_NAMESPACE }}
           PLATFORMS: ${{ env.WORKFLOW_PLATFORMS }}
           PUSH_REGISTRY: ${{ needs.config.outputs.can_primary }}
           PUSH_ALIYUN: ${{ needs.config.outputs.can_aliyun }}
@@ -297,6 +320,10 @@ jobs:
           images = []
           primary = {'amd64': os.environ['TARGET_IMAGE_AMD64'], 'arm64': os.environ['TARGET_IMAGE_ARM64']}
           aliyun = {'amd64': os.environ['ALIYUN_IMAGE_AMD64'], 'arm64': os.environ['ALIYUN_IMAGE_ARM64']}
+          for arch in aliyun:
+              if not aliyun[arch] or aliyun[arch] == ':' + os.environ['RELEASE_TAG']:
+                  local_name = primary[arch].rsplit('/', 1)[-1].rsplit(':', 1)[0]
+                  aliyun[arch] = f"{os.environ['ALIYUN_REGISTRY']}/{os.environ['ALIYUN_NAMESPACE']}/{local_name}:{os.environ['RELEASE_TAG']}"
           for path in sorted(files):
               arch = path.rsplit('_', 1)[1].removesuffix('.tar.gz')
               image = aliyun[arch] if os.environ['PUSH_ALIYUN'] == 'true' else primary[arch]
