@@ -105,6 +105,7 @@ GitHub Actions 会根据矩阵自动传入 `TARGETARCH=amd64` 或 `TARGETARCH=ar
 
 ```text
 IMAGE_TAG
+RELEASE_NAME
 TARGET_IMAGE_AMD64
 TARGET_IMAGE_ARM64
 ALIYUN_REGISTRY
@@ -116,3 +117,16 @@ ENABLE_HAP_WEBHOOK
 ```
 
 账号、密码和 Webhook 签名不要写入 `.image-build.env`，必须放在 GitHub Actions Secrets。配置 Job 会在执行前检查所有模块，并把启用、跳过及缺失字段写入 Actions Summary。
+
+## CI 专用脚本
+
+项目运行脚本仍放在 `scripts/`。镜像构建 Workflow 使用的辅助脚本单独放在 `.github/image-make/`：
+
+```text
+.github/image-make/config.py   # 配置覆盖、模块开关和 Summary
+.github/image-make/build.sh    # 单架构构建、Aliyun Push 和本地打包
+.github/image-make/package.sh  # 构建产物校验或 Release-only 打包
+.github/image-make/release.py  # Release manifest 和 Summary
+```
+
+`RELEASE_NAME` 控制 Release 压缩包和 manifest 的项目名称。复制这套 Workflow 到其他项目时，只需要修改 `.image-build.env`、Dockerfile 和必要的镜像配置，不需要把 CI 脚本混入项目业务 `scripts/`。
