@@ -101,14 +101,51 @@ jobs:
     name: Check module configuration
     runs-on: ubuntu-24.04
     outputs:
+      tag: ${{ steps.check.outputs.tag }}
+      target_image_amd64: ${{ steps.check.outputs.target_image_amd64 }}
+      target_image_arm64: ${{ steps.check.outputs.target_image_arm64 }}
+      aliyun_image_amd64: ${{ steps.check.outputs.aliyun_image_amd64 }}
+      aliyun_image_arm64: ${{ steps.check.outputs.aliyun_image_arm64 }}
+      aliyun_registry: ${{ steps.check.outputs.aliyun_registry }}
+      aliyun_namespace: ${{ steps.check.outputs.aliyun_namespace }}
+      build_enabled: ${{ steps.check.outputs.build_enabled }}
+      aliyun_push_enabled: ${{ steps.check.outputs.aliyun_push_enabled }}
+      release_enabled: ${{ steps.check.outputs.release_enabled }}
+      hap_enabled: ${{ steps.check.outputs.hap_enabled }}
+      dockerfile: ${{ steps.check.outputs.dockerfile }}
+      docker_context: ${{ steps.check.outputs.docker_context }}
       can_primary: ${{ steps.check.outputs.can_primary }}
       can_aliyun: ${{ steps.check.outputs.can_aliyun }}
       can_build: ${{ steps.check.outputs.can_build }}
       can_package: ${{ steps.check.outputs.can_package }}
       can_release: ${{ steps.check.outputs.can_release }}
     steps:
+      - uses: actions/checkout@v4
       - id: check
         env:
+          CONFIG_FILE: .image-build.env
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_TAG: ${{ inputs.tag }}
+          INPUT_TARGET_IMAGE_AMD64: ${{ inputs.target_image_amd64 }}
+          INPUT_TARGET_IMAGE_ARM64: ${{ inputs.target_image_arm64 }}
+          INPUT_ALIYUN_NAMESPACE: ${{ inputs.aliyun_namespace }}
+          INPUT_ALIYUN_IMAGE_AMD64: ${{ inputs.aliyun_image_amd64 }}
+          INPUT_ALIYUN_IMAGE_ARM64: ${{ inputs.aliyun_image_arm64 }}
+          INPUT_BUILD_IMAGE: ${{ inputs.build_image }}
+          INPUT_PUSH_ALIYUN: ${{ inputs.push_aliyun }}
+          INPUT_CREATE_RELEASE: ${{ inputs.create_release }}
+          INPUT_NOTIFY_HAP: ${{ inputs.notify_hap }}
+          VAR_IMAGE_TAG: ${{ vars.IMAGE_TAG }}
+          VAR_TARGET_IMAGE_AMD64: ${{ vars.TARGET_IMAGE_AMD64 }}
+          VAR_TARGET_IMAGE_ARM64: ${{ vars.TARGET_IMAGE_ARM64 }}
+          VAR_ALIYUN_NAMESPACE: ${{ vars.ALIYUN_NAMESPACE }}
+          VAR_ALIYUN_REGISTRY: ${{ vars.ALIYUN_REGISTRY }}
+          VAR_ALIYUN_IMAGE_AMD64: ${{ vars.ALIYUN_IMAGE_AMD64 }}
+          VAR_ALIYUN_IMAGE_ARM64: ${{ vars.ALIYUN_IMAGE_ARM64 }}
+          VAR_ENABLE_BUILD: ${{ vars.ENABLE_BUILD }}
+          VAR_ENABLE_ALIYUN_PUSH: ${{ vars.ENABLE_ALIYUN_PUSH }}
+          VAR_ENABLE_RELEASE: ${{ vars.ENABLE_RELEASE }}
+          VAR_ENABLE_HAP_WEBHOOK: ${{ vars.ENABLE_HAP_WEBHOOK }}
           REGISTRY: ${{ env.REGISTRY }}
           ALIYUN_REGISTRY: ${{ env.ALIYUN_REGISTRY }}
           ALIYUN_USERNAME: ${{ env.ALIYUN_REGISTRY_USERNAME || env.REGISTRY_USERNAME }}
@@ -127,6 +164,45 @@ jobs:
         run: |
           python3 - <<'PY'
           import os
+
+          config = {}
+          if os.path.exists(os.environ['CONFIG_FILE']):
+              for raw in open(os.environ['CONFIG_FILE'], encoding='utf-8'):
+                  line = raw.strip()
+                  if not line or line.startswith('#') or '=' not in line:
+                      continue
+                  key, value = line.split('=', 1)
+                  config[key.strip()] = value.strip().strip('"\'')
+
+          def value(key, input_key=None, var_key=None, default=''):
+              if os.environ.get('EVENT_NAME') != 'push' and input_key and os.environ.get(input_key, '').strip():
+                  return os.environ[input_key].strip()
+              if var_key and os.environ.get(var_key, '').strip():
+                  return os.environ[var_key].strip()
+              return config.get(key, default).strip()
+
+          tag = value('IMAGE_TAG', 'INPUT_TAG', 'VAR_IMAGE_TAG', '1.0.0')
+          target_amd64 = value('TARGET_IMAGE_AMD64', 'INPUT_TARGET_IMAGE_AMD64', 'VAR_TARGET_IMAGE_AMD64')
+          target_arm64 = value('TARGET_IMAGE_ARM64', 'INPUT_TARGET_IMAGE_ARM64', 'VAR_TARGET_IMAGE_ARM64')
+          aliyun_namespace = value('ALIYUN_NAMESPACE', 'INPUT_ALIYUN_NAMESPACE', 'VAR_ALIYUN_NAMESPACE', 'hap-mdy')
+          aliyun_registry = value('ALIYUN_REGISTRY', None, 'VAR_ALIYUN_REGISTRY', 'registry.cn-hangzhou.aliyuncs.com')
+          aliyun_image_amd64 = value('ALIYUN_IMAGE_AMD64', 'INPUT_ALIYUN_IMAGE_AMD64', 'VAR_ALIYUN_IMAGE_AMD64')
+          aliyun_image_arm64 = value('ALIYUN_IMAGE_ARM64', 'INPUT_ALIYUN_IMAGE_ARM64', 'VAR_ALIYUN_IMAGE_ARM64')
+          dockerfile = config.get('DOCKERFILE', 'Dockerfile').strip()
+          docker_context = config.get('DOCKER_CONTEXT', '.').strip()
+          build_enabled = value('ENABLE_BUILD', 'INPUT_BUILD_IMAGE', 'VAR_ENABLE_BUILD', 'true').lower() == 'true'
+          aliyun_push_enabled = value('ENABLE_ALIYUN_PUSH', 'INPUT_PUSH_ALIYUN', 'VAR_ENABLE_ALIYUN_PUSH', 'true').lower() == 'true'
+          release_enabled = value('ENABLE_RELEASE', 'INPUT_CREATE_RELEASE', 'VAR_ENABLE_RELEASE', 'true').lower() == 'true'
+          hap_enabled = value('ENABLE_HAP_WEBHOOK', 'INPUT_NOTIFY_HAP', 'VAR_ENABLE_HAP_WEBHOOK', 'true').lower() == 'true'
+          os.environ['TARGET_IMAGE_AMD64'] = target_amd64
+          os.environ['TARGET_IMAGE_ARM64'] = target_arm64
+          os.environ['ALIYUN_NAMESPACE'] = aliyun_namespace
+          os.environ['ALIYUN_REGISTRY'] = aliyun_registry
+          os.environ['ALIYUN_IMAGE_AMD64'] = aliyun_image_amd64
+          os.environ['ALIYUN_IMAGE_ARM64'] = aliyun_image_arm64
+          os.environ['BUILD_IMAGE'] = str(build_enabled).lower()
+          os.environ['PUSH_ALIYUN'] = str(aliyun_push_enabled).lower()
+          os.environ['CREATE_RELEASE'] = str(release_enabled).lower()
 
           def enabled(name):
               return os.environ.get(name, '').lower() == 'true'
@@ -156,6 +232,19 @@ jobs:
               f.write('## Module configuration\n\n')
               f.write('\n'.join(f'- {item}' for item in reasons) + '\n')
           with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as f:
+              f.write(f'tag={tag}\n')
+              f.write(f'target_image_amd64={target_amd64}\n')
+              f.write(f'target_image_arm64={target_arm64}\n')
+              f.write(f'aliyun_image_amd64={aliyun_image_amd64}\n')
+              f.write(f'aliyun_image_arm64={aliyun_image_arm64}\n')
+              f.write(f'aliyun_registry={aliyun_registry}\n')
+              f.write(f'aliyun_namespace={aliyun_namespace}\n')
+              f.write(f'build_enabled={str(build_enabled).lower()}\n')
+              f.write(f'aliyun_push_enabled={str(aliyun_push_enabled).lower()}\n')
+              f.write(f'release_enabled={str(release_enabled).lower()}\n')
+              f.write(f'hap_enabled={str(hap_enabled).lower()}\n')
+              f.write(f'dockerfile={dockerfile}\n')
+              f.write(f'docker_context={docker_context}\n')
               f.write(f'can_primary={str(primary).lower()}\n')
               f.write(f'can_aliyun={str(aliyun).lower()}\n')
               f.write(f'can_build={str(can_build).lower()}\n')
@@ -186,19 +275,19 @@ jobs:
         if: ${{ needs.config.outputs.can_aliyun == 'true' }}
         uses: docker/login-action@v3
         with:
-          registry: ${{ env.ALIYUN_REGISTRY }}
+          registry: ${{ needs.config.outputs.aliyun_registry }}
           username: ${{ env.ALIYUN_REGISTRY_USERNAME || env.REGISTRY_USERNAME }}
           password: ${{ env.ALIYUN_REGISTRY_PASSWORD || env.REGISTRY_PASSWORD }}
       - name: Build and push architecture image
         env:
-          TARGET_IMAGE: ${{ matrix.architecture == 'amd64' && env.WORKFLOW_TARGET_IMAGE_AMD64 || env.WORKFLOW_TARGET_IMAGE_ARM64 }}:${{ env.WORKFLOW_TAG }}
-          ALIYUN_IMAGE: ${{ matrix.architecture == 'amd64' && env.WORKFLOW_ALIYUN_IMAGE_AMD64 || env.WORKFLOW_ALIYUN_IMAGE_ARM64 }}:${{ env.WORKFLOW_TAG }}
-          ALIYUN_REGISTRY: ${{ env.ALIYUN_REGISTRY }}
-          ALIYUN_NAMESPACE: ${{ env.WORKFLOW_ALIYUN_NAMESPACE }}
+          TARGET_IMAGE: ${{ matrix.architecture == 'amd64' && needs.config.outputs.target_image_amd64 || needs.config.outputs.target_image_arm64 }}:${{ needs.config.outputs.tag }}
+          ALIYUN_IMAGE: ${{ matrix.architecture == 'amd64' && needs.config.outputs.aliyun_image_amd64 || needs.config.outputs.aliyun_image_arm64 }}:${{ needs.config.outputs.tag }}
+          ALIYUN_REGISTRY: ${{ needs.config.outputs.aliyun_registry }}
+          ALIYUN_NAMESPACE: ${{ needs.config.outputs.aliyun_namespace }}
           PUSH_ALIYUN: ${{ needs.config.outputs.can_aliyun }}
         run: |
           set -euo pipefail
-          docker buildx build --platform "${{ matrix.platform }}" --tag "$TARGET_IMAGE" --load .
+          docker buildx build --platform "${{ matrix.platform }}" --file "${{ needs.config.outputs.dockerfile }}" --tag "$TARGET_IMAGE" --load "${{ needs.config.outputs.docker_context }}"
           if [[ "$PUSH_ALIYUN" == true ]]; then
             if [[ -z "$ALIYUN_IMAGE" || "$ALIYUN_IMAGE" == ":${TARGET_IMAGE##*:}" ]]; then
               image_name="${TARGET_IMAGE%:*}"
@@ -209,18 +298,18 @@ jobs:
             docker push "$ALIYUN_IMAGE"
           fi
       - name: Package locally built image
-        if: ${{ env.WORKFLOW_CREATE_RELEASE == 'true' }}
+        if: ${{ needs.config.outputs.release_enabled == 'true' }}
         env:
-          TARGET_IMAGE: ${{ matrix.architecture == 'amd64' && env.WORKFLOW_TARGET_IMAGE_AMD64 || env.WORKFLOW_TARGET_IMAGE_ARM64 }}:${{ env.WORKFLOW_TAG }}
+          TARGET_IMAGE: ${{ matrix.architecture == 'amd64' && needs.config.outputs.target_image_amd64 || needs.config.outputs.target_image_arm64 }}:${{ needs.config.outputs.tag }}
           ARCHITECTURE: ${{ matrix.architecture }}
         run: |
           set -euo pipefail
           mkdir -p release-assets
-          archive="release-assets/hap-promtail-vlogs-mongodb_${{ env.WORKFLOW_TAG }}_${ARCHITECTURE}.tar.gz"
+          archive="release-assets/hap-promtail-vlogs-mongodb_${{ needs.config.outputs.tag }}_${ARCHITECTURE}.tar.gz"
           docker save "$TARGET_IMAGE" | gzip -9 > "$archive"
           sha256sum "$archive" > "$archive.sha256"
       - name: Upload locally built image package
-        if: ${{ env.WORKFLOW_CREATE_RELEASE == 'true' }}
+        if: ${{ needs.config.outputs.release_enabled == 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: release-${{ matrix.architecture }}
@@ -249,19 +338,19 @@ jobs:
         if: ${{ needs.config.outputs.can_aliyun == 'true' }}
         uses: docker/login-action@v3
         with:
-          registry: ${{ env.ALIYUN_REGISTRY }}
+          registry: ${{ needs.config.outputs.aliyun_registry }}
           username: ${{ env.ALIYUN_REGISTRY_USERNAME || env.REGISTRY_USERNAME }}
           password: ${{ env.ALIYUN_REGISTRY_PASSWORD || env.REGISTRY_PASSWORD }}
       - name: Package image
         env:
-          TARGET_IMAGE: ${{ matrix.architecture == 'amd64' && env.WORKFLOW_TARGET_IMAGE_AMD64 || env.WORKFLOW_TARGET_IMAGE_ARM64 }}:${{ env.WORKFLOW_TAG }}
-          ALIYUN_IMAGE: ${{ matrix.architecture == 'amd64' && env.WORKFLOW_ALIYUN_IMAGE_AMD64 || env.WORKFLOW_ALIYUN_IMAGE_ARM64 }}:${{ env.WORKFLOW_TAG }}
-          ALIYUN_REGISTRY: ${{ env.ALIYUN_REGISTRY }}
-          ALIYUN_NAMESPACE: ${{ env.WORKFLOW_ALIYUN_NAMESPACE }}
+          TARGET_IMAGE: ${{ matrix.architecture == 'amd64' && needs.config.outputs.target_image_amd64 || needs.config.outputs.target_image_arm64 }}:${{ needs.config.outputs.tag }}
+          ALIYUN_IMAGE: ${{ matrix.architecture == 'amd64' && needs.config.outputs.aliyun_image_amd64 || needs.config.outputs.aliyun_image_arm64 }}:${{ needs.config.outputs.tag }}
+          ALIYUN_REGISTRY: ${{ needs.config.outputs.aliyun_registry }}
+          ALIYUN_NAMESPACE: ${{ needs.config.outputs.aliyun_namespace }}
           ARCHITECTURE: ${{ matrix.architecture }}
           PLATFORMS: ${{ env.WORKFLOW_PLATFORMS }}
           PUSH_ALIYUN: ${{ needs.config.outputs.can_aliyun }}
-          BUILD_IMAGE: ${{ env.WORKFLOW_BUILD_IMAGE }}
+          BUILD_IMAGE: ${{ needs.config.outputs.build_enabled }}
         run: |
           set -euo pipefail
           [[ "$PLATFORMS" == *linux/amd64* && "$PLATFORMS" == *linux/arm64* ]] || {
@@ -279,7 +368,7 @@ jobs:
           docker pull --platform "linux/${ARCHITECTURE}" "$package_image"
           actual="$(docker image inspect "$package_image" --format '{{.Architecture}}')"
           test "$actual" = "$ARCHITECTURE"
-          archive="release-assets/hap-promtail-vlogs-mongodb_${{ env.WORKFLOW_TAG }}_${ARCHITECTURE}.tar.gz"
+          archive="release-assets/hap-promtail-vlogs-mongodb_${{ needs.config.outputs.tag }}_${ARCHITECTURE}.tar.gz"
           docker save "$package_image" | gzip -9 > "$archive"
           sha256sum "$archive" > "$archive.sha256"
       - uses: actions/upload-artifact@v4
@@ -302,17 +391,17 @@ jobs:
           merge-multiple: true
       - name: Create release manifest
         env:
-          TARGET_IMAGE_AMD64: ${{ env.WORKFLOW_TARGET_IMAGE_AMD64 }}:${{ env.WORKFLOW_TAG }}
-          TARGET_IMAGE_ARM64: ${{ env.WORKFLOW_TARGET_IMAGE_ARM64 }}:${{ env.WORKFLOW_TAG }}
-          ALIYUN_IMAGE_AMD64: ${{ env.WORKFLOW_ALIYUN_IMAGE_AMD64 }}:${{ env.WORKFLOW_TAG }}
-          ALIYUN_IMAGE_ARM64: ${{ env.WORKFLOW_ALIYUN_IMAGE_ARM64 }}:${{ env.WORKFLOW_TAG }}
-          ALIYUN_REGISTRY: ${{ env.ALIYUN_REGISTRY }}
-          ALIYUN_NAMESPACE: ${{ env.WORKFLOW_ALIYUN_NAMESPACE }}
+          TARGET_IMAGE_AMD64: ${{ needs.config.outputs.target_image_amd64 }}:${{ needs.config.outputs.tag }}
+          TARGET_IMAGE_ARM64: ${{ needs.config.outputs.target_image_arm64 }}:${{ needs.config.outputs.tag }}
+          ALIYUN_IMAGE_AMD64: ${{ needs.config.outputs.aliyun_image_amd64 }}:${{ needs.config.outputs.tag }}
+          ALIYUN_IMAGE_ARM64: ${{ needs.config.outputs.aliyun_image_arm64 }}:${{ needs.config.outputs.tag }}
+          ALIYUN_REGISTRY: ${{ needs.config.outputs.aliyun_registry }}
+          ALIYUN_NAMESPACE: ${{ needs.config.outputs.aliyun_namespace }}
           PLATFORMS: ${{ env.WORKFLOW_PLATFORMS }}
           PUSH_REGISTRY: ${{ needs.config.outputs.can_primary }}
           PUSH_ALIYUN: ${{ needs.config.outputs.can_aliyun }}
-          BUILD_IMAGE: ${{ env.WORKFLOW_BUILD_IMAGE }}
-          RELEASE_TAG: ${{ env.WORKFLOW_TAG }}
+          BUILD_IMAGE: ${{ needs.config.outputs.build_enabled }}
+          RELEASE_TAG: ${{ needs.config.outputs.tag }}
         run: |
           python3 - <<'PY'
           import glob, hashlib, json, os
@@ -338,12 +427,12 @@ jobs:
           PY
       - uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ env.WORKFLOW_TAG }}
-          name: ${{ env.WORKFLOW_TAG }}
+          tag_name: ${{ needs.config.outputs.tag }}
+          name: ${{ needs.config.outputs.tag }}
           generate_release_notes: true
           files: release-assets/*
       - name: Notify HAP Webhook
-        if: ${{ env.WORKFLOW_NOTIFY_HAP == 'true' && env.HAP_WEBHOOK_URL != '' }}
+        if: ${{ needs.config.outputs.hap_enabled == 'true' && env.HAP_WEBHOOK_URL != '' }}
         run: |
           headers=(-H 'Content-Type: application/json')
           [[ -z "${HAP_WEBHOOK_APP_KEY:-}" ]] || headers+=(-H "AppKey: $HAP_WEBHOOK_APP_KEY")

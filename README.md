@@ -50,3 +50,30 @@ HAP 配置：
 - 可选：`HAP_WEBHOOK_APP_KEY`、`HAP_WEBHOOK_SIGN`
 
 HAP URL 为空时跳过通知，并在 Actions Summary 中说明原因。
+
+## 项目配置文件
+
+`.image-build.env` 是项目级默认配置。它使用简单的 `KEY=VALUE` 格式，支持 `#` 注释，适合直接复制到其他项目后修改。
+
+配置覆盖顺序从高到低为：
+
+1. 手动 `Run workflow` 输入
+2. GitHub Repository Variables
+3. `.image-build.env`
+4. Workflow 默认值
+
+常用 Repository Variables：
+
+```text
+IMAGE_TAG
+TARGET_IMAGE_AMD64
+TARGET_IMAGE_ARM64
+ALIYUN_REGISTRY
+ALIYUN_NAMESPACE
+ENABLE_BUILD
+ENABLE_ALIYUN_PUSH
+ENABLE_RELEASE
+ENABLE_HAP_WEBHOOK
+```
+
+账号、密码和 Webhook 签名不要写入 `.image-build.env`，必须放在 GitHub Actions Secrets。配置 Job 会在执行前检查所有模块，并把启用、跳过及缺失字段写入 Actions Summary。

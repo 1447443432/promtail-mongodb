@@ -1,10 +1,10 @@
-ARG TARGETARCH=amd64
+ARG TARGETARCH
 FROM registry.cn-shanghai.aliyuncs.com/jing-images/linux_${TARGETARCH}_alpine:3.20.3
 
 ARG TARGETARCH
 
-RUN echo "https://mirrors.aliyun.com/alpine/v3.23/main" > /etc/apk/repositories \
-    && echo "https://mirrors.aliyun.com/alpine/v3.23/community" >> /etc/apk/repositories \
+RUN echo "https://mirrors.aliyun.com/alpine/v3.20/main" > /etc/apk/repositories \
+    && echo "https://mirrors.aliyun.com/alpine/v3.20/community" >> /etc/apk/repositories \
     && apk update \
     && apk add --no-cache \
        loki-promtail \
