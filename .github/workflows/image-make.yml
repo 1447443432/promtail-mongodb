@@ -124,7 +124,7 @@ jobs:
       can_package: ${{ steps.check.outputs.can_package }}
       can_release: ${{ steps.check.outputs.can_release }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - id: check
         env:
           CONFIG_FILE: .image-build.env
@@ -211,6 +211,7 @@ jobs:
           os.environ['ALIYUN_IMAGE_AMD64'] = aliyun_image_amd64
           os.environ['ALIYUN_IMAGE_ARM64'] = aliyun_image_arm64
           os.environ['BUILD_IMAGE'] = str(build_enabled).lower()
+          os.environ['PUSH_REGISTRY'] = os.environ.get('PUSH_REGISTRY', '').lower()
           os.environ['PUSH_ALIYUN'] = str(aliyun_push_enabled).lower()
           os.environ['CREATE_RELEASE'] = str(release_enabled).lower()
 
@@ -242,8 +243,20 @@ jobs:
               reasons.append('HAP Webhook: configured and will be notified after Release.')
           else:
               reasons.append('HAP Webhook skipped: HAP_WEBHOOK_URL is missing.')
+          primary_status = 'ready' if primary else 'skipped: ' + ', '.join(primary_missing)
+          aliyun_status = 'ready' if aliyun else 'skipped: ' + ', '.join(aliyun_missing)
           with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as f:
-              f.write('## Module configuration\n\n')
+              f.write('# Image Make configuration\n\n')
+              f.write(f'- **Release tag:** `{tag}`\n')
+              f.write(f'- **Dockerfile:** `{dockerfile}`\n')
+              f.write(f'- **Build context:** `{docker_context}`\n\n')
+              f.write('| Module | Status | Details |\n|---|---|---|\n')
+              f.write(f'| Build | **{"ready" if can_build else "skipped"}** | enabled: `{str(build_enabled).lower()}`, bases: `{base_image_amd64 or "missing"}` / `{base_image_arm64 or "missing"}` |\n')
+              f.write(f'| Primary image names | **{primary_status}** | `{target_amd64 or "missing"}` / `{target_arm64 or "missing"}` |\n')
+              f.write(f'| Aliyun push | **{aliyun_status}** | `{aliyun_registry}/{aliyun_namespace}`; credentials are required only for this push |\n')
+              f.write(f'| GitHub Release | **{"ready" if can_release else "skipped"}** | enabled: `{str(release_enabled).lower()}` |\n')
+              f.write(f'| HAP Webhook | **{"ready" if os.environ.get("HAP_WEBHOOK_URL", "").strip() and hap_enabled else "skipped"}** | enabled: `{str(hap_enabled).lower()}` |\n\n')
+              f.write('## Decisions and skip reasons\n\n')
               f.write('\n'.join(f'- {item}' for item in reasons) + '\n')
           with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as f:
               f.write(f'tag={tag}\n')
@@ -285,8 +298,8 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
+      - uses: actions/checkout@v6
+      - uses: docker/setup-buildx-action@v4
       - name: Login to base image registry when credentials are configured
         if: ${{ env.BASE_REGISTRY_USERNAME != '' && env.BASE_REGISTRY_PASSWORD != '' }}
         env:
@@ -297,7 +310,7 @@ jobs:
           printf '%s' "$BASE_REGISTRY_PASSWORD" | docker login "$registry" --username "$BASE_REGISTRY_USERNAME" --password-stdin
       - name: Login to Aliyun registry
         if: ${{ needs.config.outputs.can_aliyun == 'true' }}
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ${{ needs.config.outputs.aliyun_registry }}
           username: ${{ env.ALIYUN_REGISTRY_USERNAME || env.REGISTRY_USERNAME }}
@@ -331,11 +344,43 @@ jobs:
           set -euo pipefail
           mkdir -p release-assets
           archive="release-assets/hap-promtail-vlogs-mongodb_${{ needs.config.outputs.tag }}_${ARCHITECTURE}.tar.gz"
-          docker save "$TARGET_IMAGE" | gzip -9 > "$archive"
-          sha256sum "$archive" > "$archive.sha256"
+           docker save "$TARGET_IMAGE" | gzip -9 > "$archive"
+           sha256sum "$archive" > "$archive.sha256"
+      - name: Write build summary
+        env:
+          TARGET_IMAGE: ${{ matrix.architecture == 'amd64' && needs.config.outputs.target_image_amd64 || needs.config.outputs.target_image_arm64 }}:${{ needs.config.outputs.tag }}
+          ALIYUN_IMAGE_OVERRIDE: ${{ matrix.architecture == 'amd64' && needs.config.outputs.aliyun_image_amd64 || needs.config.outputs.aliyun_image_arm64 }}:${{ needs.config.outputs.tag }}
+          ALIYUN_REGISTRY: ${{ needs.config.outputs.aliyun_registry }}
+          ALIYUN_NAMESPACE: ${{ needs.config.outputs.aliyun_namespace }}
+          BASE_IMAGE: ${{ matrix.architecture == 'amd64' && needs.config.outputs.base_image_amd64 || needs.config.outputs.base_image_arm64 }}
+          PUSH_ALIYUN: ${{ needs.config.outputs.can_aliyun }}
+        run: |
+          set -euo pipefail
+          aliyun_image="$ALIYUN_IMAGE_OVERRIDE"
+          if [[ -z "$aliyun_image" || "$aliyun_image" == ":${TARGET_IMAGE##*:}" ]]; then
+            image_name="${TARGET_IMAGE%:*}"; image_name="${image_name##*/}"
+            aliyun_image="${ALIYUN_REGISTRY}/${ALIYUN_NAMESPACE}/${image_name}:${TARGET_IMAGE##*:}"
+          fi
+          {
+            echo "## Build ${{ matrix.architecture }} summary"
+            echo
+            echo "| Item | Value |"
+            echo "|---|---|"
+            echo "| Architecture | `${{ matrix.architecture }}` |"
+            echo "| Platform | `${{ matrix.platform }}` |"
+            echo "| Runner | `${{ matrix.runner }}` |"
+            echo "| Base image | `$BASE_IMAGE` |"
+            echo "| Local image | `$TARGET_IMAGE` |"
+            if [[ "$PUSH_ALIYUN" == true ]]; then
+              echo "| Aliyun push | enabled: `$aliyun_image` |"
+            else
+              echo "| Aliyun push | skipped: registry credentials or destination are missing |"
+            fi
+            echo "| Release package | `hap-promtail-vlogs-mongodb_${{ needs.config.outputs.tag }}_${{ matrix.architecture }}.tar.gz` |"
+          } >> "$GITHUB_STEP_SUMMARY"
       - name: Upload locally built image package
         if: ${{ needs.config.outputs.release_enabled == 'true' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: release-${{ matrix.architecture }}
           path: release-assets/*
@@ -358,10 +403,10 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
       - name: Login to Aliyun registry
         if: ${{ needs.config.outputs.can_aliyun == 'true' }}
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ${{ needs.config.outputs.aliyun_registry }}
           username: ${{ env.ALIYUN_REGISTRY_USERNAME || env.REGISTRY_USERNAME }}
@@ -394,9 +439,29 @@ jobs:
           actual="$(docker image inspect "$package_image" --format '{{.Architecture}}')"
           test "$actual" = "$ARCHITECTURE"
           archive="release-assets/hap-promtail-vlogs-mongodb_${{ needs.config.outputs.tag }}_${ARCHITECTURE}.tar.gz"
-          docker save "$package_image" | gzip -9 > "$archive"
-          sha256sum "$archive" > "$archive.sha256"
-      - uses: actions/upload-artifact@v4
+           docker save "$package_image" | gzip -9 > "$archive"
+           sha256sum "$archive" > "$archive.sha256"
+      - name: Write package summary
+        env:
+          ARCHITECTURE: ${{ matrix.architecture }}
+          TARGET_IMAGE: ${{ matrix.architecture == 'amd64' && needs.config.outputs.target_image_amd64 || needs.config.outputs.target_image_arm64 }}:${{ needs.config.outputs.tag }}
+          ALIYUN_IMAGE: ${{ matrix.architecture == 'amd64' && needs.config.outputs.aliyun_image_amd64 || needs.config.outputs.aliyun_image_arm64 }}:${{ needs.config.outputs.tag }}
+          ALIYUN_REGISTRY: ${{ needs.config.outputs.aliyun_registry }}
+          ALIYUN_NAMESPACE: ${{ needs.config.outputs.aliyun_namespace }}
+        run: |
+          package_image="$ALIYUN_IMAGE"
+          if [[ -z "$package_image" || "$package_image" == ":${TARGET_IMAGE##*:}" ]]; then
+            image_name="${TARGET_IMAGE%:*}"; image_name="${image_name##*/}"
+            package_image="${ALIYUN_REGISTRY}/${ALIYUN_NAMESPACE}/${image_name}:${TARGET_IMAGE##*:}"
+          fi
+          {
+            echo "## Package $ARCHITECTURE summary"
+            echo
+            echo "- **Source image:** `$package_image`"
+            echo "- **Platform check:** `linux/$ARCHITECTURE`"
+            echo "- **Archive:** `hap-promtail-vlogs-mongodb_${{ needs.config.outputs.tag }}_${ARCHITECTURE}.tar.gz`"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v7
         with:
           name: release-${{ matrix.architecture }}
           path: release-assets/*
@@ -409,7 +474,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           pattern: release-*
           path: release-assets
@@ -450,7 +515,7 @@ jobs:
           if os.environ['PUSH_ALIYUN'] == 'true': published.extend(aliyun.values())
           json.dump({'event': 'image_release_ready', 'release_tag': os.environ['RELEASE_TAG'], 'image': images[0]['image'] if images else '', 'published_images': published, 'platforms': os.environ['PLATFORMS'].split(','), 'images': images}, open('release-assets/release-manifest.json', 'w'), indent=2)
           PY
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ needs.config.outputs.tag }}
           name: ${{ needs.config.outputs.tag }}
@@ -463,3 +528,28 @@ jobs:
           [[ -z "${HAP_WEBHOOK_APP_KEY:-}" ]] || headers+=(-H "AppKey: $HAP_WEBHOOK_APP_KEY")
           [[ -z "${HAP_WEBHOOK_SIGN:-}" ]] || headers+=(-H "Sign: $HAP_WEBHOOK_SIGN")
           curl --fail-with-body --retry 2 --connect-timeout 10 --max-time 60 -sS -X POST "$HAP_WEBHOOK_URL" "${headers[@]}" --data-binary @release-assets/release-manifest.json
+      - name: Write release summary
+        if: ${{ always() }}
+        env:
+          RELEASE_TAG: ${{ needs.config.outputs.tag }}
+          HAP_ENABLED: ${{ needs.config.outputs.hap_enabled }}
+          HAP_WEBHOOK_URL: ${{ env.HAP_WEBHOOK_URL }}
+        run: |
+          python3 - <<'PY'
+          import json, os
+          manifest = json.load(open('release-assets/release-manifest.json', encoding='utf-8'))
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as f:
+              f.write('# Create Release summary\n\n')
+              f.write(f'- **Repository:** `{os.environ["GITHUB_REPOSITORY"]}`\n')
+              f.write(f'- **Tag:** `{os.environ["RELEASE_TAG"]}`\n\n')
+              f.write('| Architecture | Image | Archive | SHA256 |\n|---|---|---|---|\n')
+              for item in manifest.get('images', []):
+                  f.write(f'| `{item["architecture"]}` | `{item["image"]}` | [{item["archive"]}]({item["download_url"]}) | `{item["sha256"]}` |\n')
+              f.write('\n## HAP sync\n\n')
+              if os.environ.get('HAP_ENABLED') != 'true':
+                  f.write('HAP Webhook skipped: module is disabled.\n')
+              elif not os.environ.get('HAP_WEBHOOK_URL', '').strip():
+                  f.write('HAP Webhook skipped: HAP_WEBHOOK_URL is missing.\n')
+              else:
+                  f.write('HAP Webhook: configured; see the notification step for the request result.\n')
+          PY
