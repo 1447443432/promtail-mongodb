@@ -42,8 +42,8 @@ tag 默认是 `1.0.0`。手动运行时可修改 Workflow 输入；自动提交�
 amd64 和 arm64 的基础镜像地址可以完全不同，不能假设只替换镜像名中的架构字符串即可。请在 `.image-build.env` 中分别配置：
 
 ```bash
-BASE_IMAGE_AMD64=registry.example.com/base/linux-amd64:3.20
-BASE_IMAGE_ARM64=another.example.com/base/arm64-runtime:3.20
+BASE_IMAGE_AMD64=registry.example.com/base/linux-amd64:3.23
+BASE_IMAGE_ARM64=another.example.com/base/arm64-runtime:3.23
 ```
 
 Workflow 会把对应值通过 `--build-arg BASE_IMAGE=...` 传给 Dockerfile。直接手动构建时，Dockerfile 默认使用 amd64 基础镜像；构建 arm64 时显式传入：
