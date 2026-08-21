@@ -1,7 +1,7 @@
-# Manual `docker build .` defaults to the amd64 base image. CI passes the
-# architecture-specific BASE_IMAGE explicitly, so amd64 and arm64 may use
-# completely different repositories, names, or tags.
-ARG BASE_IMAGE=registry.cn-shanghai.aliyuncs.com/jing-images/linux_amd64_alpine:3.23
+# Manual builds use the official multi-architecture Alpine image. CI passes
+# BASE_IMAGE explicitly, so projects with different amd64/arm64 base images
+# can still override it per architecture.
+ARG BASE_IMAGE=alpine:3.23
 FROM ${BASE_IMAGE}
 
 ARG TARGETARCH

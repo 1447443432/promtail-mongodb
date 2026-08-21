@@ -46,10 +46,16 @@ BASE_IMAGE_AMD64=registry.example.com/base/linux-amd64:3.23
 BASE_IMAGE_ARM64=another.example.com/base/arm64-runtime:3.23
 ```
 
-Workflow 会把对应值通过 `--build-arg BASE_IMAGE=...` 传给 Dockerfile。直接手动构建时，Dockerfile 默认使用 amd64 基础镜像；构建 arm64 时显式传入：
+Workflow 会把对应值通过 `--build-arg BASE_IMAGE=...` 传给 Dockerfile。默认使用官方多架构 `alpine:3.23`，直接手动构建会按当前 Docker 平台自动选择 amd64 或 arm64：
 
 ```bash
-docker build --build-arg BASE_IMAGE=another.example.com/base/arm64-runtime:3.20 --build-arg TARGETARCH=arm64 .
+docker build -t promtail-mongodb:amd64 .
+```
+
+需要指定不同基础镜像时，再显式传入：
+
+```bash
+docker build --build-arg BASE_IMAGE=another.example.com/base/arm64-runtime:3.23 -t promtail-mongodb:arm64 .
 ```
 
 如果基础镜像仓库是私有仓库，可配置 Secrets `BASE_REGISTRY_USERNAME` 和 `BASE_REGISTRY_PASSWORD`。Workflow 会从当前架构的 `BASE_IMAGE_*` 地址自动解析 Registry 并在构建前登录，不需要额外配置 `BASE_REGISTRY_*`。
@@ -70,16 +76,16 @@ HAP URL 为空时跳过通知，并在 Actions Summary 中说明原因。
 
 ## 手动 Docker 构建
 
-Dockerfile 兼容直接手动构建，默认使用 amd64：
+Dockerfile 兼容直接手动构建，默认使用官方多架构 `alpine:3.23`：
 
 ```bash
 docker build -t promtail-mongodb:amd64 .
 ```
 
-手动构建 arm64 时显式传入架构：
+在 arm64 主机上使用同一条命令即可；跨平台构建时指定平台：
 
 ```bash
-docker build --build-arg TARGETARCH=arm64 -t promtail-mongodb:arm64 .
+docker buildx build --platform linux/arm64 --load -t promtail-mongodb:arm64 .
 ```
 
 GitHub Actions 会根据矩阵自动传入 `TARGETARCH=amd64` 或 `TARGETARCH=arm64`。
