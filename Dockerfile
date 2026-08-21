@@ -1,7 +1,8 @@
-# Manual `docker build .` defaults to amd64. CI passes arm64 explicitly for
-# the native ARM runner.
-ARG TARGETARCH=amd64
-FROM registry.cn-shanghai.aliyuncs.com/jing-images/linux_${TARGETARCH}_alpine:3.20.3
+# Manual `docker build .` defaults to the amd64 base image. CI passes the
+# architecture-specific BASE_IMAGE explicitly, so amd64 and arm64 may use
+# completely different repositories, names, or tags.
+ARG BASE_IMAGE=registry.cn-shanghai.aliyuncs.com/jing-images/linux_amd64_alpine:3.20.3
+FROM ${BASE_IMAGE}
 
 ARG TARGETARCH
 
