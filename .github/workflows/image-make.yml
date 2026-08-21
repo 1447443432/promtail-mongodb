@@ -63,11 +63,11 @@ env:
   WORKFLOW_PLATFORMS: ${{ github.event_name == 'push' && 'linux/amd64,linux/arm64' || inputs.platforms }}
   WORKFLOW_TARGET_IMAGE: ${{ github.event_name == 'push' && 'registry.cn-hangzhou.aliyuncs.com/hap-mdy/hap-promtail-vlogs-mongodb' || inputs.target_image }}
   WORKFLOW_ALIYUN_IMAGE: ${{ github.event_name == 'push' && 'registry.cn-hangzhou.aliyuncs.com/hap-mdy/hap-promtail-vlogs-mongodb' || inputs.aliyun_image }}
-  WORKFLOW_BUILD_IMAGE: ${{ github.event_name == 'push' && 'true' || inputs.build_image }}
-  WORKFLOW_PUSH_REGISTRY: ${{ github.event_name == 'push' && 'true' || inputs.push_registry }}
-  WORKFLOW_PUSH_ALIYUN: ${{ github.event_name == 'push' && 'false' || inputs.push_aliyun }}
-  WORKFLOW_CREATE_RELEASE: ${{ github.event_name == 'push' && 'true' || inputs.create_release }}
-  WORKFLOW_NOTIFY_HAP: ${{ github.event_name == 'push' && 'false' || inputs.notify_hap }}
+  WORKFLOW_BUILD_IMAGE: ${{ github.event_name == 'push' && vars.ENABLE_BUILD == 'true' || inputs.build_image }}
+  WORKFLOW_PUSH_REGISTRY: ${{ github.event_name == 'push' && vars.ENABLE_PUSH_REGISTRY == 'true' || inputs.push_registry }}
+  WORKFLOW_PUSH_ALIYUN: ${{ github.event_name == 'push' && vars.ENABLE_PUSH_ALIYUN == 'true' || inputs.push_aliyun }}
+  WORKFLOW_CREATE_RELEASE: ${{ github.event_name == 'push' && vars.ENABLE_CREATE_RELEASE == 'true' || inputs.create_release }}
+  WORKFLOW_NOTIFY_HAP: ${{ github.event_name == 'push' && vars.ENABLE_NOTIFY_HAP == 'true' || inputs.notify_hap }}
   REGISTRY: ${{ vars.REGISTRY }}
   REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
   REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
@@ -80,7 +80,7 @@ env:
 
 jobs:
   build:
-    if: ${{ env.WORKFLOW_BUILD_IMAGE == 'true' && env.WORKFLOW_OPERATION != 'release' && (env.WORKFLOW_PUSH_REGISTRY == 'true' || env.WORKFLOW_PUSH_ALIYUN == 'true') }}
+    if: ${{ (github.event_name == 'push' && vars.ENABLE_BUILD == 'true' || inputs.build_image == true) && (github.event_name == 'push' || inputs.operation != 'release') && ((github.event_name == 'push' && (vars.ENABLE_PUSH_REGISTRY == 'true' || vars.ENABLE_PUSH_ALIYUN == 'true')) || inputs.push_registry == true || inputs.push_aliyun == true) }}
     strategy:
       fail-fast: false
       matrix:
@@ -127,7 +127,7 @@ jobs:
 
   package:
     needs: build
-    if: ${{ env.WORKFLOW_CREATE_RELEASE == 'true' && always() && (env.WORKFLOW_OPERATION == 'release' || (env.WORKFLOW_OPERATION == 'build-and-release' && (env.WORKFLOW_BUILD_IMAGE != 'true' || needs.build.result == 'success'))) }}
+    if: ${{ always() && ((github.event_name == 'push' && vars.ENABLE_CREATE_RELEASE == 'true' && vars.ENABLE_BUILD == 'true' && needs.build.result == 'success') || (github.event_name != 'push' && inputs.create_release == true && (inputs.operation == 'release' || (inputs.operation == 'build-and-release' && (!inputs.build_image || needs.build.result == 'success'))))) }}
     strategy:
       fail-fast: false
       matrix:
@@ -197,7 +197,7 @@ jobs:
           if-no-files-found: error
 
   release:
-    if: ${{ env.WORKFLOW_CREATE_RELEASE == 'true' && (env.WORKFLOW_OPERATION == 'release' || env.WORKFLOW_OPERATION == 'build-and-release') }}
+    if: ${{ (github.event_name == 'push' && vars.ENABLE_CREATE_RELEASE == 'true') || (github.event_name != 'push' && inputs.create_release == true && (inputs.operation == 'release' || inputs.operation == 'build-and-release')) }}
     needs: package
     runs-on: ubuntu-latest
     permissions:
