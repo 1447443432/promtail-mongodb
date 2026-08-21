@@ -1,0 +1,238 @@
+name: Image Make
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: build, release, or build-and-release
+        required: true
+        default: build-and-release
+        type: choice
+        options: [build, release, build-and-release]
+      tag:
+        description: Image tag and GitHub Release tag
+        required: true
+        default: 1.0.0
+        type: string
+      platforms:
+        description: Comma-separated platforms
+        required: true
+        default: linux/amd64,linux/arm64
+        type: string
+      build_image:
+        description: Build the Docker image
+        required: true
+        default: true
+        type: boolean
+      target_image:
+        description: Full target image name without tag
+        required: true
+        default: registry.cn-hangzhou.aliyuncs.com/hap-mdy/hap-promtail-vlogs-mongodb
+        type: string
+      push_registry:
+        description: Push image to the primary registry
+        required: true
+        default: true
+        type: boolean
+      push_aliyun:
+        description: Push image to the Aliyun registry
+        required: true
+        default: false
+        type: boolean
+      aliyun_image:
+        description: Aliyun image name without tag
+        required: true
+        default: registry.cn-hangzhou.aliyuncs.com/hap-mdy/hap-promtail-vlogs-mongodb
+        type: string
+      create_release:
+        description: Create GitHub Release packages
+        required: true
+        default: true
+        type: boolean
+      notify_hap:
+        description: Notify HAP Webhook after Release
+        required: true
+        default: false
+        type: boolean
+
+env:
+  REGISTRY: ${{ vars.REGISTRY }}
+  REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+  REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+  HAP_WEBHOOK_URL: ${{ secrets.HAP_WEBHOOK_URL }}
+  HAP_WEBHOOK_APP_KEY: ${{ secrets.HAP_WEBHOOK_APP_KEY }}
+  HAP_WEBHOOK_SIGN: ${{ secrets.HAP_WEBHOOK_SIGN }}
+  ALIYUN_REGISTRY: ${{ vars.ALIYUN_REGISTRY || 'registry.cn-hangzhou.aliyuncs.com' }}
+  ALIYUN_REGISTRY_USERNAME: ${{ secrets.ALIYUN_REGISTRY_USERNAME }}
+  ALIYUN_REGISTRY_PASSWORD: ${{ secrets.ALIYUN_REGISTRY_PASSWORD }}
+
+jobs:
+  build:
+    if: ${{ inputs.build_image && inputs.operation != 'release' && (inputs.push_registry || inputs.push_aliyun) }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - architecture: amd64
+            platform: linux/amd64
+            runner: ubuntu-24.04
+          - architecture: arm64
+            platform: linux/arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Login to registry
+        if: ${{ inputs.push_registry && env.REGISTRY != '' }}
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ env.REGISTRY_USERNAME }}
+          password: ${{ env.REGISTRY_PASSWORD }}
+      - name: Login to Aliyun registry
+        if: ${{ inputs.push_aliyun }}
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.ALIYUN_REGISTRY }}
+          username: ${{ env.ALIYUN_REGISTRY_USERNAME || env.REGISTRY_USERNAME }}
+          password: ${{ env.ALIYUN_REGISTRY_PASSWORD || env.REGISTRY_PASSWORD }}
+      - name: Build and push architecture image
+        env:
+          TARGET_IMAGE: ${{ inputs.target_image }}:${{ inputs.tag }}-${{ matrix.architecture }}
+          ALIYUN_IMAGE: ${{ inputs.aliyun_image }}:${{ inputs.tag }}-${{ matrix.architecture }}
+          PUSH_REGISTRY: ${{ inputs.push_registry }}
+          PUSH_ALIYUN: ${{ inputs.push_aliyun }}
+        run: |
+          set -euo pipefail
+          tags=()
+          [[ "$PUSH_REGISTRY" == true ]] && tags+=(--tag "$TARGET_IMAGE")
+          [[ "$PUSH_ALIYUN" == true ]] && tags+=(--tag "$ALIYUN_IMAGE")
+          ((${#tags[@]} > 0)) || { echo 'enable push_registry or push_aliyun' >&2; exit 1; }
+          docker buildx build --platform "${{ matrix.platform }}" "${tags[@]}" --push .
+
+  package:
+    needs: build
+    if: ${{ inputs.create_release && always() && (inputs.operation == 'release' || (inputs.operation == 'build-and-release' && (!inputs.build_image || needs.build.result == 'success'))) }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - architecture: amd64
+            platform: linux/amd64
+            runner: ubuntu-24.04
+          - architecture: arm64
+            platform: linux/arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+    steps:
+      - uses: docker/setup-buildx-action@v3
+      - name: Login to registry
+        if: ${{ inputs.push_registry && env.REGISTRY != '' }}
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ env.REGISTRY_USERNAME }}
+          password: ${{ env.REGISTRY_PASSWORD }}
+      - name: Login to Aliyun registry
+        if: ${{ inputs.push_aliyun }}
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.ALIYUN_REGISTRY }}
+          username: ${{ env.ALIYUN_REGISTRY_USERNAME || env.REGISTRY_USERNAME }}
+          password: ${{ env.ALIYUN_REGISTRY_PASSWORD || env.REGISTRY_PASSWORD }}
+      - name: Package image
+        env:
+          TARGET_IMAGE: ${{ inputs.target_image }}:${{ inputs.tag }}
+          ALIYUN_IMAGE: ${{ inputs.aliyun_image }}:${{ inputs.tag }}
+          ARCHITECTURE: ${{ matrix.architecture }}
+          PLATFORMS: ${{ inputs.platforms }}
+          PUSH_REGISTRY: ${{ inputs.push_registry }}
+          PUSH_ALIYUN: ${{ inputs.push_aliyun }}
+          BUILD_IMAGE: ${{ inputs.build_image }}
+        run: |
+          set -euo pipefail
+          [[ "$PLATFORMS" == *linux/amd64* && "$PLATFORMS" == *linux/arm64* ]] || {
+            echo 'platforms must include linux/amd64 and linux/arm64' >&2
+            exit 1
+          }
+          if [[ "$PUSH_REGISTRY" == true ]]; then
+            package_image="$TARGET_IMAGE"
+          elif [[ "$PUSH_ALIYUN" == true ]]; then
+            package_image="$ALIYUN_IMAGE"
+          else
+            echo 'enable push_registry or push_aliyun to create a release' >&2
+            exit 1
+          fi
+          if [[ "$BUILD_IMAGE" == true ]]; then
+            package_image="${package_image%:*}:${package_image##*:}-${ARCHITECTURE}"
+          fi
+          mkdir -p release-assets
+          docker pull --platform "linux/${ARCHITECTURE}" "$package_image"
+          actual="$(docker image inspect "$package_image" --format '{{.Architecture}}')"
+          test "$actual" = "$ARCHITECTURE"
+          archive="release-assets/hap-promtail-vlogs-mongodb_${{ inputs.tag }}_${ARCHITECTURE}.tar.gz"
+          docker save "$package_image" | gzip -9 > "$archive"
+          sha256sum "$archive" > "$archive.sha256"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.architecture }}
+          path: release-assets/*
+          if-no-files-found: error
+
+  release:
+    if: ${{ inputs.create_release && (inputs.operation == 'release' || inputs.operation == 'build-and-release') }}
+    needs: package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          path: release-assets
+          merge-multiple: true
+      - name: Create release manifest
+        env:
+          TARGET_IMAGE: ${{ inputs.target_image }}:${{ inputs.tag }}
+          ALIYUN_IMAGE: ${{ inputs.aliyun_image }}:${{ inputs.tag }}
+          PLATFORMS: ${{ inputs.platforms }}
+          PUSH_REGISTRY: ${{ inputs.push_registry }}
+          PUSH_ALIYUN: ${{ inputs.push_aliyun }}
+        run: |
+          python3 - <<'PY'
+          import glob, hashlib, json, os
+          files = [p for p in glob.glob('release-assets/*.tar.gz')]
+          images = []
+          base_image = os.environ['TARGET_IMAGE'] if os.environ['PUSH_REGISTRY'] == 'true' else os.environ['ALIYUN_IMAGE']
+          for path in sorted(files):
+              arch = path.rsplit('_', 1)[1].removesuffix('.tar.gz')
+              image = base_image
+              if os.environ['BUILD_IMAGE'] == 'true':
+                  image = f"{image.rsplit(':', 1)[0]}:{image.rsplit(':', 1)[1]}-{arch}"
+              images.append({'architecture': arch, 'platform': f'linux/{arch}', 'image': image, 'archive': os.path.basename(path), 'sha256': hashlib.sha256(open(path, 'rb').read()).hexdigest()})
+          base = f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/releases/download/{os.environ['TARGET_IMAGE'].rsplit(':', 1)[1]}"
+          for item in images:
+              item['download_url'] = f"{base}/{item['archive']}"
+          published = []
+          if os.environ['PUSH_REGISTRY'] == 'true': published.append(os.environ['TARGET_IMAGE'] + ('-amd64/-arm64' if os.environ['BUILD_IMAGE'] == 'true' else ''))
+          if os.environ['PUSH_ALIYUN'] == 'true': published.append(os.environ['ALIYUN_IMAGE'] + ('-amd64/-arm64' if os.environ['BUILD_IMAGE'] == 'true' else ''))
+          json.dump({'event': 'image_release_ready', 'release_tag': os.environ['TARGET_IMAGE'].rsplit(':', 1)[1], 'image': published[0] if published else '', 'published_images': published, 'platforms': os.environ['PLATFORMS'].split(','), 'images': images}, open('release-assets/release-manifest.json', 'w'), indent=2)
+          PY
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.tag }}
+          name: ${{ inputs.tag }}
+          generate_release_notes: true
+          files: release-assets/*
+      - name: Notify HAP Webhook
+        if: ${{ inputs.notify_hap && env.HAP_WEBHOOK_URL != '' }}
+        run: |
+          headers=(-H 'Content-Type: application/json')
+          [[ -z "${HAP_WEBHOOK_APP_KEY:-}" ]] || headers+=(-H "AppKey: $HAP_WEBHOOK_APP_KEY")
+          [[ -z "${HAP_WEBHOOK_SIGN:-}" ]] || headers+=(-H "Sign: $HAP_WEBHOOK_SIGN")
+          curl --fail-with-body --retry 2 --connect-timeout 10 --max-time 60 -sS -X POST "$HAP_WEBHOOK_URL" "${headers[@]}" --data-binary @release-assets/release-manifest.json
