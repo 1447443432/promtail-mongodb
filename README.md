@@ -27,7 +27,7 @@ registry.cn-hangzhou.aliyuncs.com/hap-mdy/hap-promtail-vlogs-mongodb-amd64:1.0.0
 registry.cn-hangzhou.aliyuncs.com/hap-mdy/hap-promtail-vlogs-mongodb-arm64:1.0.0
 ```
 
-tag 默认是 `1.0.0`，可在 Workflow 输入中修改；两个架构镜像地址也可以分别修改。开启 `push_aliyun` 后，需要分别填写阿里云 amd64/arm64 镜像地址。
+tag 默认是 `1.0.0`，手动运行时可在 Workflow 输入中修改；自动提交时可通过 Repository Variable `IMAGE_TAG` 修改。两个架构镜像地址也可以分别修改。开启 `push_aliyun` 后，需要分别填写阿里云 amd64/arm64 镜像地址。
 
 需要在仓库 `Settings → Secrets and variables → Actions` 配置：
 

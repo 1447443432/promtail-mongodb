@@ -69,7 +69,7 @@ on:
 
 env:
   WORKFLOW_OPERATION: ${{ github.event_name == 'push' && 'build-and-release' || inputs.operation }}
-  WORKFLOW_TAG: ${{ github.event_name == 'push' && format('sha-{0}', github.sha) || inputs.tag }}
+  WORKFLOW_TAG: ${{ github.event_name == 'push' && (vars.IMAGE_TAG || '1.0.0') || inputs.tag }}
   WORKFLOW_PLATFORMS: ${{ github.event_name == 'push' && 'linux/amd64,linux/arm64' || inputs.platforms }}
   WORKFLOW_TARGET_IMAGE_AMD64: ${{ github.event_name == 'push' && 'registry.cn-hangzhou.aliyuncs.com/hap-mdy/hap-promtail-vlogs-mongodb-amd64' || inputs.target_image_amd64 }}
   WORKFLOW_TARGET_IMAGE_ARM64: ${{ github.event_name == 'push' && 'registry.cn-hangzhou.aliyuncs.com/hap-mdy/hap-promtail-vlogs-mongodb-arm64' || inputs.target_image_arm64 }}
