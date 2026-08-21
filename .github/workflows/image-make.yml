@@ -118,8 +118,6 @@ jobs:
       docker_context: ${{ steps.check.outputs.docker_context }}
       base_image_amd64: ${{ steps.check.outputs.base_image_amd64 }}
       base_image_arm64: ${{ steps.check.outputs.base_image_arm64 }}
-      base_registry_amd64: ${{ steps.check.outputs.base_registry_amd64 }}
-      base_registry_arm64: ${{ steps.check.outputs.base_registry_arm64 }}
       can_primary: ${{ steps.check.outputs.can_primary }}
       can_aliyun: ${{ steps.check.outputs.can_aliyun }}
       can_build: ${{ steps.check.outputs.can_build }}
@@ -144,8 +142,6 @@ jobs:
           VAR_IMAGE_TAG: ${{ vars.IMAGE_TAG }}
           VAR_BASE_IMAGE_AMD64: ${{ vars.BASE_IMAGE_AMD64 }}
           VAR_BASE_IMAGE_ARM64: ${{ vars.BASE_IMAGE_ARM64 }}
-          VAR_BASE_REGISTRY_AMD64: ${{ vars.BASE_REGISTRY_AMD64 }}
-          VAR_BASE_REGISTRY_ARM64: ${{ vars.BASE_REGISTRY_ARM64 }}
           VAR_TARGET_IMAGE_AMD64: ${{ vars.TARGET_IMAGE_AMD64 }}
           VAR_TARGET_IMAGE_ARM64: ${{ vars.TARGET_IMAGE_ARM64 }}
           VAR_ALIYUN_NAMESPACE: ${{ vars.ALIYUN_NAMESPACE }}
@@ -194,8 +190,6 @@ jobs:
           tag = value('IMAGE_TAG', 'INPUT_TAG', 'VAR_IMAGE_TAG', '1.0.0')
           base_image_amd64 = value('BASE_IMAGE_AMD64', None, 'VAR_BASE_IMAGE_AMD64')
           base_image_arm64 = value('BASE_IMAGE_ARM64', None, 'VAR_BASE_IMAGE_ARM64')
-          base_registry_amd64 = value('BASE_REGISTRY_AMD64', None, 'VAR_BASE_REGISTRY_AMD64')
-          base_registry_arm64 = value('BASE_REGISTRY_ARM64', None, 'VAR_BASE_REGISTRY_ARM64')
           target_amd64 = value('TARGET_IMAGE_AMD64', 'INPUT_TARGET_IMAGE_AMD64', 'VAR_TARGET_IMAGE_AMD64')
           target_arm64 = value('TARGET_IMAGE_ARM64', 'INPUT_TARGET_IMAGE_ARM64', 'VAR_TARGET_IMAGE_ARM64')
           aliyun_namespace = value('ALIYUN_NAMESPACE', 'INPUT_ALIYUN_NAMESPACE', 'VAR_ALIYUN_NAMESPACE', 'hap-mdy')
@@ -255,8 +249,6 @@ jobs:
               f.write(f'tag={tag}\n')
               f.write(f'base_image_amd64={base_image_amd64}\n')
               f.write(f'base_image_arm64={base_image_arm64}\n')
-              f.write(f'base_registry_amd64={base_registry_amd64}\n')
-              f.write(f'base_registry_arm64={base_registry_arm64}\n')
               f.write(f'target_image_amd64={target_amd64}\n')
               f.write(f'target_image_arm64={target_arm64}\n')
               f.write(f'aliyun_image_amd64={aliyun_image_amd64}\n')
@@ -295,13 +287,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
-      - name: Login to base image registry
+      - name: Login to base image registry when credentials are configured
         if: ${{ env.BASE_REGISTRY_USERNAME != '' && env.BASE_REGISTRY_PASSWORD != '' }}
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ matrix.architecture == 'amd64' && needs.config.outputs.base_registry_amd64 || needs.config.outputs.base_registry_arm64 }}
-          username: ${{ env.BASE_REGISTRY_USERNAME }}
-          password: ${{ env.BASE_REGISTRY_PASSWORD }}
+        env:
+          BASE_IMAGE: ${{ matrix.architecture == 'amd64' && needs.config.outputs.base_image_amd64 || needs.config.outputs.base_image_arm64 }}
+        run: |
+          set -euo pipefail
+          registry="${BASE_IMAGE%%/*}"
+          printf '%s' "$BASE_REGISTRY_PASSWORD" | docker login "$registry" --username "$BASE_REGISTRY_USERNAME" --password-stdin
       - name: Login to Aliyun registry
         if: ${{ needs.config.outputs.can_aliyun == 'true' }}
         uses: docker/login-action@v3

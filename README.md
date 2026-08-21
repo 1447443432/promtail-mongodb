@@ -52,7 +52,7 @@ Workflow 会把对应值通过 `--build-arg BASE_IMAGE=...` 传给 Dockerfile。
 docker build --build-arg BASE_IMAGE=another.example.com/base/arm64-runtime:3.20 --build-arg TARGETARCH=arm64 .
 ```
 
-如果基础镜像仓库是私有仓库，可配置 Secrets `BASE_REGISTRY_USERNAME` 和 `BASE_REGISTRY_PASSWORD`，Workflow 会在构建前登录对应架构的基础镜像 Registry。
+如果基础镜像仓库是私有仓库，可配置 Secrets `BASE_REGISTRY_USERNAME` 和 `BASE_REGISTRY_PASSWORD`。Workflow 会从当前架构的 `BASE_IMAGE_*` 地址自动解析 Registry 并在构建前登录，不需要额外配置 `BASE_REGISTRY_*`。
 
 阿里云配置：
 
