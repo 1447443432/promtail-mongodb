@@ -104,8 +104,6 @@ jobs:
       - id: check
         env:
           REGISTRY: ${{ env.REGISTRY }}
-          REGISTRY_USERNAME: ${{ env.REGISTRY_USERNAME }}
-          REGISTRY_PASSWORD: ${{ env.REGISTRY_PASSWORD }}
           ALIYUN_REGISTRY: ${{ env.ALIYUN_REGISTRY }}
           ALIYUN_USERNAME: ${{ env.ALIYUN_REGISTRY_USERNAME || env.REGISTRY_USERNAME }}
           ALIYUN_PASSWORD: ${{ env.ALIYUN_REGISTRY_PASSWORD || env.REGISTRY_PASSWORD }}
@@ -117,6 +115,7 @@ jobs:
           PUSH_ALIYUN: ${{ env.WORKFLOW_PUSH_ALIYUN }}
           BUILD_IMAGE: ${{ env.WORKFLOW_BUILD_IMAGE }}
           CREATE_RELEASE: ${{ env.WORKFLOW_CREATE_RELEASE }}
+          OPERATION: ${{ env.WORKFLOW_OPERATION }}
           HAP_WEBHOOK_URL: ${{ env.HAP_WEBHOOK_URL }}
         run: |
           python3 - <<'PY'
@@ -125,17 +124,17 @@ jobs:
           def enabled(name):
               return os.environ.get(name, '').lower() == 'true'
 
-          primary = enabled('PUSH_REGISTRY') and all(os.environ.get(k, '').strip() for k in ('REGISTRY', 'REGISTRY_USERNAME', 'REGISTRY_PASSWORD', 'TARGET_IMAGE_AMD64', 'TARGET_IMAGE_ARM64'))
+          primary = all(os.environ.get(k, '').strip() for k in ('TARGET_IMAGE_AMD64', 'TARGET_IMAGE_ARM64'))
           aliyun = enabled('PUSH_ALIYUN') and all(os.environ.get(k, '').strip() for k in ('ALIYUN_REGISTRY', 'ALIYUN_USERNAME', 'ALIYUN_PASSWORD', 'ALIYUN_IMAGE_AMD64', 'ALIYUN_IMAGE_ARM64'))
           source = primary or aliyun
           can_build = enabled('BUILD_IMAGE') and source
-          can_package = enabled('CREATE_RELEASE') and source
+          can_package = enabled('CREATE_RELEASE') and (aliyun if os.environ.get('OPERATION') == 'release' else can_build)
           can_release = can_package
           reasons = []
-          primary_missing = [k for k in ('REGISTRY', 'REGISTRY_USERNAME', 'REGISTRY_PASSWORD', 'TARGET_IMAGE_AMD64', 'TARGET_IMAGE_ARM64') if not os.environ.get(k, '').strip()]
+          primary_missing = [k for k in ('TARGET_IMAGE_AMD64', 'TARGET_IMAGE_ARM64') if not os.environ.get(k, '').strip()]
           aliyun_missing = [k for k in ('ALIYUN_REGISTRY', 'ALIYUN_USERNAME', 'ALIYUN_PASSWORD', 'ALIYUN_IMAGE_AMD64', 'ALIYUN_IMAGE_ARM64') if not os.environ.get(k, '').strip()]
           if enabled('PUSH_REGISTRY') and not primary:
-              reasons.append('Primary registry skipped; missing: ' + ', '.join(primary_missing))
+              reasons.append('Local build skipped; missing: ' + ', '.join(primary_missing))
           if enabled('PUSH_ALIYUN') and not aliyun:
               reasons.append('Aliyun registry skipped; missing: ' + ', '.join(aliyun_missing))
           if not source:
@@ -176,13 +175,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
-      - name: Login to registry
-        if: ${{ needs.config.outputs.can_primary == 'true' }}
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ env.REGISTRY_USERNAME }}
-          password: ${{ env.REGISTRY_PASSWORD }}
       - name: Login to Aliyun registry
         if: ${{ needs.config.outputs.can_aliyun == 'true' }}
         uses: docker/login-action@v3
@@ -194,19 +186,36 @@ jobs:
         env:
           TARGET_IMAGE: ${{ matrix.architecture == 'amd64' && env.WORKFLOW_TARGET_IMAGE_AMD64 || env.WORKFLOW_TARGET_IMAGE_ARM64 }}:${{ env.WORKFLOW_TAG }}
           ALIYUN_IMAGE: ${{ matrix.architecture == 'amd64' && env.WORKFLOW_ALIYUN_IMAGE_AMD64 || env.WORKFLOW_ALIYUN_IMAGE_ARM64 }}:${{ env.WORKFLOW_TAG }}
-          PUSH_REGISTRY: ${{ needs.config.outputs.can_primary }}
           PUSH_ALIYUN: ${{ needs.config.outputs.can_aliyun }}
         run: |
           set -euo pipefail
-          tags=()
-          [[ "$PUSH_REGISTRY" == true ]] && tags+=(--tag "$TARGET_IMAGE")
-          [[ "$PUSH_ALIYUN" == true ]] && tags+=(--tag "$ALIYUN_IMAGE")
-          ((${#tags[@]} > 0)) || { echo 'enable push_registry or push_aliyun' >&2; exit 1; }
-          docker buildx build --platform "${{ matrix.platform }}" "${tags[@]}" --push .
+          docker buildx build --platform "${{ matrix.platform }}" --tag "$TARGET_IMAGE" --load .
+          if [[ "$PUSH_ALIYUN" == true ]]; then
+            docker tag "$TARGET_IMAGE" "$ALIYUN_IMAGE"
+            docker push "$ALIYUN_IMAGE"
+          fi
+      - name: Package locally built image
+        if: ${{ env.WORKFLOW_CREATE_RELEASE == 'true' }}
+        env:
+          TARGET_IMAGE: ${{ matrix.architecture == 'amd64' && env.WORKFLOW_TARGET_IMAGE_AMD64 || env.WORKFLOW_TARGET_IMAGE_ARM64 }}:${{ env.WORKFLOW_TAG }}
+          ARCHITECTURE: ${{ matrix.architecture }}
+        run: |
+          set -euo pipefail
+          mkdir -p release-assets
+          archive="release-assets/hap-promtail-vlogs-mongodb_${{ env.WORKFLOW_TAG }}_${ARCHITECTURE}.tar.gz"
+          docker save "$TARGET_IMAGE" | gzip -9 > "$archive"
+          sha256sum "$archive" > "$archive.sha256"
+      - name: Upload locally built image package
+        if: ${{ env.WORKFLOW_CREATE_RELEASE == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.architecture }}
+          path: release-assets/*
+          if-no-files-found: error
 
   package:
     needs: [config, build]
-    if: ${{ always() && needs.config.outputs.can_package == 'true' && (github.event_name == 'push' && needs.build.result == 'success' || github.event_name != 'push' && (inputs.operation == 'release' || needs.build.result == 'success')) }}
+    if: ${{ always() && needs.config.outputs.can_package == 'true' && github.event_name != 'push' && inputs.operation == 'release' && needs.build.result == 'skipped' }}
     strategy:
       fail-fast: false
       matrix:
@@ -222,13 +231,6 @@ jobs:
       contents: read
     steps:
       - uses: docker/setup-buildx-action@v3
-      - name: Login to registry
-        if: ${{ needs.config.outputs.can_primary == 'true' }}
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ env.REGISTRY_USERNAME }}
-          password: ${{ env.REGISTRY_PASSWORD }}
       - name: Login to Aliyun registry
         if: ${{ needs.config.outputs.can_aliyun == 'true' }}
         uses: docker/login-action@v3
@@ -242,7 +244,6 @@ jobs:
           ALIYUN_IMAGE: ${{ matrix.architecture == 'amd64' && env.WORKFLOW_ALIYUN_IMAGE_AMD64 || env.WORKFLOW_ALIYUN_IMAGE_ARM64 }}:${{ env.WORKFLOW_TAG }}
           ARCHITECTURE: ${{ matrix.architecture }}
           PLATFORMS: ${{ env.WORKFLOW_PLATFORMS }}
-          PUSH_REGISTRY: ${{ needs.config.outputs.can_primary }}
           PUSH_ALIYUN: ${{ needs.config.outputs.can_aliyun }}
           BUILD_IMAGE: ${{ env.WORKFLOW_BUILD_IMAGE }}
         run: |
@@ -251,14 +252,8 @@ jobs:
             echo 'platforms must include linux/amd64 and linux/arm64' >&2
             exit 1
           }
-          if [[ "$PUSH_ALIYUN" == true ]]; then
-            package_image="$ALIYUN_IMAGE"
-          elif [[ "$PUSH_REGISTRY" == true ]]; then
-            package_image="$TARGET_IMAGE"
-          else
-            echo 'enable push_registry or push_aliyun to create a release' >&2
-            exit 1
-          fi
+          [[ "$PUSH_ALIYUN" == true ]] || { echo 'Aliyun image is required for release-only mode' >&2; exit 1; }
+          package_image="$ALIYUN_IMAGE"
           mkdir -p release-assets
           docker pull --platform "linux/${ARCHITECTURE}" "$package_image"
           actual="$(docker image inspect "$package_image" --format '{{.Architecture}}')"
@@ -273,8 +268,8 @@ jobs:
           if-no-files-found: error
 
   release:
-    if: ${{ always() && needs.config.outputs.can_release == 'true' && needs.package.result == 'success' }}
-    needs: [config, package]
+    if: ${{ always() && needs.config.outputs.can_release == 'true' && ((github.event_name == 'push' && needs.build.result == 'success') || (github.event_name != 'push' && ((inputs.operation == 'build-and-release' && needs.build.result == 'success') || (inputs.operation == 'release' && needs.package.result == 'success')))) }}
+    needs: [config, build, package]
     runs-on: ubuntu-latest
     permissions:
       contents: write
