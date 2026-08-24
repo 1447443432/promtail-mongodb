@@ -38,7 +38,7 @@ release-arm64
 
 ## Aliyun 缺配置导致整个流程失败
 
-Aliyun Push 必须独立判断。缺少 Registry、namespace、用户名或密码时：
+Aliyun Push 必须独立判断。缺少 Registry、用户名或密码时：
 
 1. config Summary 写出缺少字段
 2. Build 继续

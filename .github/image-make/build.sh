@@ -55,8 +55,9 @@ if [[ "$PUSH_ALIYUN" == true ]]; then
   echo "[OK] docker push"
 fi
 
-image_name="${TARGET_IMAGE%:*}"
-image_name="${image_name##*/}"
+image_name="${TARGET_IMAGE##*/}"
+image_name="${image_name%%@*}"
+image_name="${image_name%%:*}"
 if [[ "$RELEASE_ENABLED" == true ]]; then
   echo "========== image package =========="
   echo "[INFO] saving local image..."

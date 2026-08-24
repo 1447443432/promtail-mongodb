@@ -17,7 +17,7 @@
 - [ ] `RELEASE_NAME` 可由配置覆盖
 - [ ] `BASE_IMAGE_AMD64` 与 `BASE_IMAGE_ARM64` 独立
 - [ ] 主镜像名不要求认证
-- [ ] Aliyun Registry、namespace、账号密码缺失时只跳过 Push
+- [ ] Aliyun Registry、账号密码缺失时只跳过 Push
 - [ ] HAP URL 缺失时只跳过通知
 - [ ] HAP payload 使用 nginx-make 兼容固定字段
 - [ ] `attachment_urls` 是 JSON 字符串，且只包含实际 Release 附件 URL

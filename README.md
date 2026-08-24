@@ -32,9 +32,9 @@ docker push 阿里云镜像
 
 使用 `Actions → Image Make → Run workflow` 时，`operation` 请选择以下模式之一：
 
-- `build-release`：构建 amd64/arm64 镜像、生成压缩包和 SHA256，并创建 GitHub Release。
-- `pull-release`：不重新构建，使用已有阿里云镜像打包并创建 GitHub Release。
-- `build-push-release`：构建镜像、推送阿里云、打包并创建 GitHub Release。
+- `build-release`：构建并发布。
+- `pull-release`：使用已有阿里云镜像发布。
+- `build-push-release`：构建、推送阿里云并发布。
 
 这里的 `push` 仅表示 GitHub 的自动提交触发事件，不是手动运行模式。提交到 `master` 时，Workflow 默认执行 `build-push-release`；仅修改 `agents/` 时不会触发。
 
@@ -47,7 +47,6 @@ docker push 阿里云镜像
 - `create_release`：Release 模块开关；关闭后不会打包上传 Release
 - `notify_hap`：HAP Webhook 通知模块开关；关闭或 URL 为空时只跳过通知
 - `target_image_amd64`、`target_image_arm64`：覆盖两个架构的主镜像地址；留空时使用配置中的主镜像地址，地址未带 Tag 时由 Docker 按 `latest` 解析
-- `aliyun_namespace`：覆盖阿里云命名空间；启用 Push 时必填，不用于自动生成镜像地址
 - `aliyun_image_amd64`、`aliyun_image_arm64`：可选的阿里云目标镜像地址；留空时复用对应主镜像地址，填写后按原样使用
 
 `pull-release` 需要提前存在可拉取的阿里云镜像和完整的阿里云凭据。如果只想构建而不创建 Release，可将 `create_release` 关闭；`build-release` 本身会创建 Release。
@@ -81,7 +80,6 @@ docker build --build-arg BASE_IMAGE=another.example.com/base/arm64-runtime:3.23 
 
 - Variable：`ALIYUN_REGISTRY`，默认 `registry.cn-hangzhou.aliyuncs.com`
 - Secrets：`ALIYUN_REGISTRY_USERNAME`、`ALIYUN_REGISTRY_PASSWORD`
-- Workflow 输入：`aliyun_namespace`，默认 `hap-mdy`
 - `aliyun_image_amd64`、`aliyun_image_arm64`：阿里云目标镜像地址，按填写内容原样使用
 
 HAP 配置：
@@ -138,7 +136,7 @@ GitHub Actions 会根据矩阵自动传入 `TARGETARCH=amd64` 或 `TARGETARCH=ar
 
 `.image-build.env` 是项目级默认配置。它使用简单的 `KEY=VALUE` 格式，支持 `#` 注释，适合直接复制到其他项目后修改。
 
-`.github/workflows/image-make.yml` 和 `.github/image-make/` 不保存本项目的镜像仓库或 namespace；项目个性化值集中在 `.image-build.env`，因此这套 Workflow 可以直接复制到其他项目使用。
+`.github/workflows/image-make.yml` 和 `.github/image-make/` 不保存本项目的镜像仓库；项目个性化值集中在 `.image-build.env`，因此这套 Workflow 可以直接复制到其他项目使用。
 
 仅修改 `agents/` 下的 Skill 不会触发镜像构建；需要验证 Skill 时请手动运行 Workflow。
 
@@ -166,7 +164,6 @@ GitHub Actions 会根据矩阵自动传入 `TARGETARCH=amd64` 或 `TARGETARCH=ar
 | `notify_hap` | `false` | 是 | 是否启用 HAP 通知；还必须配置 Webhook URL |
 | `target_image_amd64` | 空 | 否 | 空时使用 `.image-build.env` 或 Repository Variable；地址按原样使用，未带 Tag 时 Docker 使用 `latest` |
 | `target_image_arm64` | 空 | 否 | 同上 |
-| `aliyun_namespace` | 空 | 否 | 空时使用 `.image-build.env` 或 Repository Variable；没有完整阿里云配置只跳过 Push |
 | `aliyun_image_amd64` | 空 | 否 | 可选；留空时复用主 amd64 镜像地址，填写后按原样使用 |
 | `aliyun_image_arm64` | 空 | 否 | 同上 |
 
@@ -180,7 +177,6 @@ BASE_IMAGE_ARM64=alpine:3.23
 TARGET_IMAGE_AMD64=registry.cn-hangzhou.aliyuncs.com/hap-mdy/hap-promtail-vlogs-mongodb-amd64:1.0.0
 TARGET_IMAGE_ARM64=registry.cn-hangzhou.aliyuncs.com/hap-mdy/hap-promtail-vlogs-mongodb-arm64:1.0.0
 ALIYUN_REGISTRY=registry.cn-hangzhou.aliyuncs.com
-ALIYUN_NAMESPACE=hap-mdy
 ENABLE_BUILD=true
 ENABLE_ALIYUN_PUSH=true
 ENABLE_RELEASE=true
@@ -225,7 +221,6 @@ Variables 用于在 GitHub 侧覆盖非敏感配置，不是全部必填。在 `
 | `BASE_IMAGE_AMD64` | `alpine:3.23` | amd64 基础镜像 |
 | `BASE_IMAGE_ARM64` | `alpine:3.23` | arm64 基础镜像 |
 | `ALIYUN_REGISTRY` | `registry.cn-hangzhou.aliyuncs.com` | 阿里云 Registry 地址 |
-| `ALIYUN_NAMESPACE` | `hap-mdy` | 阿里云命名空间 |
 | `ALIYUN_IMAGE_AMD64` | `registry.example.com/project/image-amd64` | 阿里云 amd64 镜像地址，按原样使用 |
 | `ALIYUN_IMAGE_ARM64` | `registry.example.com/project/image-arm64` | 阿里云 arm64 镜像地址，按原样使用 |
 | `ENABLE_BUILD` | `true` | 构建模块开关 |
@@ -285,7 +280,6 @@ Webhook URL 为空、`ENABLE_HAP_WEBHOOK` 不是 `true`，或 Release 没有成�
 ```text
 Repository Variables:
   ALIYUN_REGISTRY=registry.cn-hangzhou.aliyuncs.com
-  ALIYUN_NAMESPACE=hap-mdy
   ENABLE_ALIYUN_PUSH=true
 
 Repository Secrets:
@@ -293,7 +287,7 @@ Repository Secrets:
   ALIYUN_REGISTRY_PASSWORD=<阿里云密码或 Token>
 ```
 
-阿里云配置及账号密码齐全时，Workflow 执行 `docker tag` 和 `docker push`；阿里云目标地址留空时复用对应主镜像地址，填写后按原样使用。缺少 Registry、namespace 或账号密码时，只跳过阿里云 Push，Build 和 Release 仍可继续；Release 会使用主镜像对应的本地构建产物。
+阿里云 Registry、账号密码齐全时，Workflow 执行 `docker tag` 和 `docker push`；阿里云目标地址留空时复用对应主镜像地址，填写后按原样使用。缺少 Registry 或账号密码时，只跳过阿里云 Push，Build 和 Release 仍可继续；Release 会使用主镜像对应的本地构建产物。
 
 ### 配置后的验证建议
 

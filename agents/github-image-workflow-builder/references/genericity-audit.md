@@ -36,7 +36,7 @@ rg -n "当前仓库名|当前镜像名|当前 namespace|客户名" \
 - `BASE_IMAGE_AMD64`、`BASE_IMAGE_ARM64` 没有可靠通用值时留空并跳过 Build
 - 主镜像地址没有通用值时留空并跳过 Build/Release；镜像地址若未带 Tag，由 Docker 使用 `latest`，不得由脚本拼接
 - 阿里云目标地址留空时复用对应主镜像完整引用，不能把空值改成固定的 `latest`
-- `ALIYUN_REGISTRY` 和 `ALIYUN_NAMESPACE` 没有通用值时留空并跳过 Aliyun Push
+- `ALIYUN_REGISTRY` 没有通用值时留空并跳过 Aliyun Push
 - `RELEASE_NAME` 未配置时使用 `GITHUB_REPOSITORY` 的最后一段
 - `ALPINE_MIRROR`、`ALPINE_VERSION` 只有在 Dockerfile 确实是 Alpine 时才定义
 

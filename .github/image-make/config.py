@@ -40,7 +40,6 @@ base_amd64 = value("BASE_IMAGE_AMD64", None, "VAR_BASE_IMAGE_AMD64")
 base_arm64 = value("BASE_IMAGE_ARM64", None, "VAR_BASE_IMAGE_ARM64")
 target_amd64 = value("TARGET_IMAGE_AMD64", "INPUT_TARGET_IMAGE_AMD64", "VAR_TARGET_IMAGE_AMD64")
 target_arm64 = value("TARGET_IMAGE_ARM64", "INPUT_TARGET_IMAGE_ARM64", "VAR_TARGET_IMAGE_ARM64")
-aliyun_namespace = value("ALIYUN_NAMESPACE", "INPUT_ALIYUN_NAMESPACE", "VAR_ALIYUN_NAMESPACE")
 aliyun_registry = value("ALIYUN_REGISTRY", None, "VAR_ALIYUN_REGISTRY")
 aliyun_amd64 = value("ALIYUN_IMAGE_AMD64", "INPUT_ALIYUN_IMAGE_AMD64", "VAR_ALIYUN_IMAGE_AMD64")
 aliyun_arm64 = value("ALIYUN_IMAGE_ARM64", "INPUT_ALIYUN_IMAGE_ARM64", "VAR_ALIYUN_IMAGE_ARM64")
@@ -68,7 +67,6 @@ aliyun_password = os.environ.get("ALIYUN_PASSWORD", "").strip()
 aliyun_missing = [
     name for name, item in (
         ("ALIYUN_REGISTRY", aliyun_registry),
-        ("ALIYUN_NAMESPACE", aliyun_namespace),
         ("ALIYUN_USERNAME", aliyun_user),
         ("ALIYUN_PASSWORD", aliyun_password),
         ("ALIYUN_IMAGE_AMD64", aliyun_amd64),
@@ -110,7 +108,7 @@ with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
     summary.write(f"| Build | **{status(can_build)}** | enabled: `{str(build_enabled).lower()}`, bases: `{base_amd64 or 'missing'}` / `{base_arm64 or 'missing'}` |\n")
     summary.write(f"| Primary image names | **{status(primary, ', '.join(primary_missing))}** | `{target_amd64 or 'missing'}` / `{target_arm64 or 'missing'}` |\n")
     aliyun_status = "disabled" if not aliyun_enabled else status(aliyun, ", ".join(aliyun_missing))
-    summary.write(f"| Aliyun push | **{aliyun_status}** | `{aliyun_registry}/{aliyun_namespace}` |\n")
+    summary.write(f"| Aliyun push | **{aliyun_status}** | `{aliyun_registry}` |\n")
     summary.write(f"| GitHub Release | **{status(can_release)}** | enabled: `{str(release_enabled).lower()}` |\n")
     summary.write(f"| HAP Webhook | **{'ready' if hap_enabled and os.environ.get('HAP_WEBHOOK_URL', '').strip() else 'skipped'}** | enabled: `{str(hap_enabled).lower()}` |\n\n")
     summary.write("## Decisions and skip reasons\n\n")
@@ -121,7 +119,7 @@ outputs = {
     "base_image_amd64": base_amd64, "base_image_arm64": base_arm64,
     "target_image_amd64": target_amd64, "target_image_arm64": target_arm64,
     "aliyun_image_amd64": aliyun_amd64, "aliyun_image_arm64": aliyun_arm64,
-    "aliyun_registry": aliyun_registry, "aliyun_namespace": aliyun_namespace,
+    "aliyun_registry": aliyun_registry,
     "build_enabled": str(build_enabled).lower(), "aliyun_push_enabled": str(aliyun_enabled).lower(),
     "release_enabled": str(release_enabled).lower(), "hap_enabled": str(hap_enabled).lower(),
     "dockerfile": dockerfile, "build_context": build_context,
