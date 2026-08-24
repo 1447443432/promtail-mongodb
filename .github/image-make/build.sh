@@ -12,12 +12,15 @@ fi
 
 builder="image-make-${ARCHITECTURE}"
 if ! docker buildx inspect "$builder" >/dev/null 2>&1; then
-  docker buildx create --name "$builder" --driver docker-container --use
+  docker buildx create --name "$builder" --driver docker-container --use >/dev/null
 else
   docker buildx use "$builder"
 fi
 
-docker buildx build --builder "$builder" \
+echo "========== docker build =========="
+echo "[INFO] docker build running..."
+build_log="build-${ARCHITECTURE}.log"
+if ! docker buildx build --builder "$builder" \
   --platform "$PLATFORM" \
   --build-arg TARGETARCH="$ARCHITECTURE" \
   --build-arg BASE_IMAGE="$BASE_IMAGE" \
@@ -25,7 +28,12 @@ docker buildx build --builder "$builder" \
   --build-arg ALPINE_VERSION="$ALPINE_VERSION" \
   --file "$DOCKERFILE" \
   --tag "$TARGET_IMAGE" \
-  --load "$BUILD_CONTEXT"
+  --load "$BUILD_CONTEXT" >"$build_log" 2>&1; then
+  echo "[ERROR] docker build failed"
+  tail -n 200 "$build_log"
+  exit 1
+fi
+echo "[OK] docker build"
 
 aliyun_image="$ALIYUN_IMAGE_OVERRIDE"
 if [[ -z "$aliyun_image" || "$aliyun_image" == ":${TARGET_IMAGE##*:}" ]]; then
