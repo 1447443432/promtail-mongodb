@@ -20,6 +20,8 @@
 - [ ] `attachment_urls` 是 JSON 字符串，且只包含实际 Release 附件 URL
 - [ ] HAP 的架构文件名、下载地址和 SHA256 来自实际产物
 - [ ] 账号、密码、签名未写入仓库
+- [ ] README 说明 GitHub Variables/Secrets 的准确入口和字段名
+- [ ] HAP URL、AppKey、Sign 的配置位置和可选性已说明
 - [ ] 没有使用 `DOCKER_CONTEXT` 作为构建目录变量
 - [ ] Alpine 源和版本通过 `ALPINE_MIRROR`、`ALPINE_VERSION` 配置
 - [ ] Dockerfile 没有重复执行 `apk update` 后再 `apk add --no-cache`

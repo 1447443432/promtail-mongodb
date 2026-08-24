@@ -149,22 +149,117 @@ GitHub Actions 会根据矩阵自动传入 `TARGETARCH=amd64` 或 `TARGETARCH=ar
 3. `.image-build.env`
 4. Workflow 默认值
 
-常用 Repository Variables：
+## GitHub Actions 配置方法
+
+所有 GitHub 端的配置入口都在仓库的：
 
 ```text
-IMAGE_TAG
-RELEASE_NAME
-TARGET_IMAGE_AMD64
-TARGET_IMAGE_ARM64
-ALIYUN_REGISTRY
-ALIYUN_NAMESPACE
-ENABLE_BUILD
-ENABLE_ALIYUN_PUSH
-ENABLE_RELEASE
-ENABLE_HAP_WEBHOOK
+Settings → Secrets and variables → Actions
 ```
 
-账号、密码和 Webhook 签名不要写入 `.image-build.env`，必须放在 GitHub Actions Secrets。配置 Job 会在执行前检查所有模块，并把启用、跳过及缺失字段写入 Actions Summary。
+请分别进入 `Variables` 和 `Secrets` 标签页配置。配置完成后，打开：
+
+```text
+Actions → Image Make → Run workflow
+```
+
+手动执行一次验证。不要把密码、Webhook URL、AppKey 或 Sign 写入 README、`.image-build.env` 或 Workflow 文件。
+
+### Repository Variables
+
+Variables 用于非敏感配置。在 `Settings → Secrets and variables → Actions → Variables → New repository variable` 中添加：
+
+| Name | 示例值 | 作用 |
+|---|---|---|
+| `IMAGE_TAG` | `1.0.0` | 默认镜像和 Release tag |
+| `RELEASE_NAME` | `promtail-mongodb` | Release 名和 HAP `project_name`；不配置时使用仓库名 |
+| `TARGET_IMAGE_AMD64` | `registry.example.com/project/image-amd64` | amd64 主镜像名，不含 tag |
+| `TARGET_IMAGE_ARM64` | `registry.example.com/project/image-arm64` | arm64 主镜像名，不含 tag |
+| `BASE_IMAGE_AMD64` | `alpine:3.23` | amd64 基础镜像 |
+| `BASE_IMAGE_ARM64` | `alpine:3.23` | arm64 基础镜像 |
+| `ALIYUN_REGISTRY` | `registry.cn-hangzhou.aliyuncs.com` | 阿里云 Registry 地址 |
+| `ALIYUN_NAMESPACE` | `hap-mdy` | 阿里云命名空间 |
+| `ALIYUN_IMAGE_AMD64` | `hap-promtail-vlogs-mongodb-amd64` | 可选，阿里云 amd64 镜像名；为空时自动根据主镜像名生成 |
+| `ALIYUN_IMAGE_ARM64` | `hap-promtail-vlogs-mongodb-arm64` | 可选，阿里云 arm64 镜像名；为空时自动根据主镜像名生成 |
+| `ENABLE_BUILD` | `true` | 构建模块开关 |
+| `ENABLE_ALIYUN_PUSH` | `true` | 阿里云 Push 模块开关 |
+| `ENABLE_RELEASE` | `true` | GitHub Release 模块开关 |
+| `ENABLE_HAP_WEBHOOK` | `true` | HAP Webhook 模块开关 |
+
+本项目也可以把上述默认值写在 `.image-build.env`；两者同时存在时，Repository Variables 优先于 `.image-build.env`。`Run workflow` 页面中直接填写的输入优先级最高。
+
+### Repository Secrets
+
+Secrets 用于敏感配置。在 `Settings → Secrets and variables → Actions → Secrets → New repository secret` 中添加：
+
+| Name | 是否必需 | 作用 |
+|---|---|---|
+| `ALIYUN_REGISTRY_USERNAME` | 使用阿里云 Push 时必需 | 阿里云 Registry 用户名 |
+| `ALIYUN_REGISTRY_PASSWORD` | 使用阿里云 Push 时必需 | 阿里云 Registry 密码或 Access Token |
+| `BASE_REGISTRY_USERNAME` | 基础镜像仓库私有时必需 | 基础镜像 Registry 用户名 |
+| `BASE_REGISTRY_PASSWORD` | 基础镜像仓库私有时必需 | 基础镜像 Registry 密码或 Token |
+| `HAP_WEBHOOK_URL` | 启用 HAP 通知时必需 | HAP Webhook 接收地址 |
+| `HAP_WEBHOOK_APP_KEY` | 可选 | 作为 `AppKey` 请求头发送 |
+| `HAP_WEBHOOK_SIGN` | 可选 | 作为 `Sign` 请求头发送 |
+
+也兼容 `REGISTRY_USERNAME` 和 `REGISTRY_PASSWORD` 作为阿里云账号密码的通用别名，但建议统一使用 `ALIYUN_REGISTRY_USERNAME` 和 `ALIYUN_REGISTRY_PASSWORD`。
+
+### HAP Webhook 配置示例
+
+1. 在 HAP 中创建用于接收 Release 信息的 Webhook，并复制 Webhook URL。
+2. 在 GitHub `Settings → Secrets and variables → Actions → Secrets` 中新增：
+
+   ```text
+   HAP_WEBHOOK_URL=https://your-hap.example.com/webhook/xxxxxxxx
+   HAP_WEBHOOK_APP_KEY=your-app-key       # 如果 HAP 要求
+   HAP_WEBHOOK_SIGN=your-sign             # 如果 HAP 要求
+   ```
+
+3. 在 Repository Variables 中设置：
+
+   ```text
+   ENABLE_HAP_WEBHOOK=true
+   ```
+
+4. 运行 `build-and-release`，Release 成功后才会执行 HAP 通知。
+
+请求头和请求体如下：
+
+```text
+Content-Type: application/json
+AppKey: <HAP_WEBHOOK_APP_KEY>   # 配置后才发送
+Sign: <HAP_WEBHOOK_SIGN>        # 配置后才发送
+```
+
+Webhook URL 为空、`ENABLE_HAP_WEBHOOK` 不是 `true`，或 Release 没有成功时，不会调用 HAP；Actions Summary 会显示具体跳过原因。HAP 通知失败会使 Release Job 失败，便于及时发现接收端或签名配置错误。
+
+### 阿里云 Push 配置示例
+
+```text
+Repository Variables:
+  ALIYUN_REGISTRY=registry.cn-hangzhou.aliyuncs.com
+  ALIYUN_NAMESPACE=hap-mdy
+  ENABLE_ALIYUN_PUSH=true
+
+Repository Secrets:
+  ALIYUN_REGISTRY_USERNAME=<阿里云账号>
+  ALIYUN_REGISTRY_PASSWORD=<阿里云密码或 Token>
+```
+
+阿里云四项配置完整时，Workflow 执行 `docker tag` 和 `docker push`。缺少 Registry、namespace、用户名或密码时，只跳过阿里云 Push，Build 和 Release 仍可继续；Release 会使用主镜像对应的本地构建产物。
+
+### 配置后的验证建议
+
+建议按以下顺序验证：
+
+1. 先用 `build-only` 验证两个架构可以成功构建。
+2. 配置阿里云后用 `build-and-release` 验证 Tag、Push 和 Release 附件。
+3. 配置 HAP 后再次运行 `build-and-release`，检查 Release Job 的 `HAP sync` 和通知步骤。
+4. 检查 HAP 接收到的 `repository`、`version`、两个架构下载地址和 SHA256 是否正确。
+
+如果某个可选模块没有配置，不要根据灰色步骤判断失败；查看 `Check module configuration` 和 `Release` 的 Actions Summary，其中会写明模块是关闭、缺少哪些配置，还是执行成功。
+
+配置 Job 会在执行前检查所有模块，并把启用、跳过及缺失字段写入 Actions Summary。
 
 ## CI 专用脚本
 
