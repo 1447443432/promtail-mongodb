@@ -42,7 +42,7 @@ metadata:
 8. HAP Webhook URL 为空或开关关闭时只跳过通知，并在 `$GITHUB_STEP_SUMMARY` 写出明确原因；不能因为 URL 为空而让 Release 失败。
 9. 每个独立 Job 都必须 checkout 仓库。Job 之间只共享 Artifact 和 Job Outputs，不共享工作区文件。
 10. 不要使用保留环境变量名作为业务配置名。尤其不要把构建目录命名为 `DOCKER_CONTEXT`；Docker 会将其解释为 Docker Context 名称。使用 `BUILD_CONTEXT`。
-11. buildx 必须可靠初始化。除了 `docker/setup-buildx-action`，构建脚本应明确选择或创建 Builder，避免空的 `BUILDX_BUILDER` 或失效 Context 导致 `no builder` 错误。
+11. buildx 必须可靠初始化。不要依赖空的 `BUILDX_BUILDER` 或某个 Action 的隐式 Builder；构建脚本应明确选择或创建 Builder，并在构建时传 `--builder`。
 12. Artifact 名称按镜像最后一段和 tag 生成，例如：
 
    ```text
@@ -104,6 +104,19 @@ BUILD_CONTEXT
 
 账号、密码、Webhook URL、签名只能来自 GitHub Actions Secrets，不得写入仓库配置文件。
 
+## 通用性审计
+
+完成后必须对 Workflow 和 CI 脚本做一次项目脱敏检查：
+
+- 搜索项目仓库名、项目镜像名、namespace、客户名和固定业务域名
+- 除示例、注释和故障文档外，Workflow 不应出现当前项目的镜像仓库或 Release 名
+- 项目默认值只能位于 `.image-build.env` 或用户明确指定的配置文件
+- 未配置镜像地址时不得使用隐含的项目默认地址；应跳过模块并写出原因
+- Release 名未配置时应从 `GITHUB_REPOSITORY` 的仓库名推导
+- 复制到第二个项目时，只需修改配置文件和 Dockerfile，不应修改 CI 引擎脚本
+
+通用性检查细则见 [references/genericity-audit.md](references/genericity-audit.md)。
+
 ## Workflow Summary 要求
 
 配置 Job 至少展示：tag、Release 名、Dockerfile、Build context、两个基础镜像、两个主镜像名、每个模块状态和跳过原因。
@@ -138,6 +151,7 @@ Summary 中不得输出密码、Token、Webhook 签名或完整 Secret 值。
 - `bash -n` 检查 CI Shell 脚本
 - `git diff --check`
 - 检查 Workflow 行为：push、手动 build、手动 build-and-release、release-only、Aliyun 缺配置、HAP URL 缺失
+- 对 Workflow 和 CI 脚本执行通用性审计，确认没有残留当前项目默认值
 - 如本机没有 Docker，明确说明未执行真实镜像构建，不要声称构建已验证
 
 用户要求提交时才执行 commit/push；提交前检查 `git status`，提交后报告 commit id 和目标分支。

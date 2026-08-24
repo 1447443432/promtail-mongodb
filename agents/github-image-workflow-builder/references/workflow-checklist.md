@@ -6,6 +6,7 @@
 - [ ] 已读取现有 `.github/workflows/`、`scripts/`、README 和配置文件
 - [ ] 没有覆盖用户未授权的工作区改动
 - [ ] CI 辅助脚本与业务脚本分离
+- [ ] 当前项目的镜像名、namespace 和 Release 名没有写入 CI 引擎
 
 ## 配置
 
@@ -55,3 +56,5 @@
 - [ ] 检查 release-only
 - [ ] 检查 Aliyun 缺账号密码
 - [ ] 检查 HAP URL 为空
+- [ ] 用 `rg` 对 Workflow 和 CI 脚本执行项目个性化字符串审计
+- [ ] 确认复制到第二个项目时只需修改 `.image-build.env` 和 Dockerfile
