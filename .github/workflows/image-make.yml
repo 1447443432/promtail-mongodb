@@ -238,6 +238,7 @@ jobs:
     permissions:
       contents: read
     steps:
+      - uses: actions/checkout@v6
       - name: Download packages from build jobs
         if: ${{ github.event_name == 'push' || inputs.operation == 'build-and-release' }}
         uses: actions/download-artifact@v8
@@ -279,6 +280,7 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v6
       - uses: actions/download-artifact@v8
         with:
           pattern: release-*
