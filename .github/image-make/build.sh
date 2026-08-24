@@ -14,7 +14,7 @@ docker buildx build --builder "$builder" \
   --build-arg BASE_IMAGE="$BASE_IMAGE" \
   --file "$DOCKERFILE" \
   --tag "$TARGET_IMAGE" \
-  --load "$DOCKER_CONTEXT"
+  --load "$BUILD_CONTEXT"
 
 aliyun_image="$ALIYUN_IMAGE_OVERRIDE"
 if [[ -z "$aliyun_image" || "$aliyun_image" == ":${TARGET_IMAGE##*:}" ]]; then

@@ -110,7 +110,7 @@ jobs:
       release_enabled: ${{ steps.check.outputs.release_enabled }}
       hap_enabled: ${{ steps.check.outputs.hap_enabled }}
       dockerfile: ${{ steps.check.outputs.dockerfile }}
-      docker_context: ${{ steps.check.outputs.docker_context }}
+      build_context: ${{ steps.check.outputs.build_context }}
       base_image_amd64: ${{ steps.check.outputs.base_image_amd64 }}
       base_image_arm64: ${{ steps.check.outputs.base_image_arm64 }}
       can_primary: ${{ steps.check.outputs.can_primary }}
@@ -211,7 +211,7 @@ jobs:
           RELEASE_NAME: ${{ needs.config.outputs.release_name }}
           RELEASE_TAG: ${{ needs.config.outputs.tag }}
           DOCKERFILE: ${{ needs.config.outputs.dockerfile }}
-          DOCKER_CONTEXT: ${{ needs.config.outputs.docker_context }}
+          BUILD_CONTEXT: ${{ needs.config.outputs.build_context }}
         run: bash .github/image-make/build.sh
       - name: Upload locally built image package
         if: ${{ needs.config.outputs.release_enabled == 'true' }}

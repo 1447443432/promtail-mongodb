@@ -41,7 +41,7 @@ aliyun_registry = value("ALIYUN_REGISTRY", None, "VAR_ALIYUN_REGISTRY", "registr
 aliyun_amd64 = value("ALIYUN_IMAGE_AMD64", "INPUT_ALIYUN_IMAGE_AMD64", "VAR_ALIYUN_IMAGE_AMD64")
 aliyun_arm64 = value("ALIYUN_IMAGE_ARM64", "INPUT_ALIYUN_IMAGE_ARM64", "VAR_ALIYUN_IMAGE_ARM64")
 dockerfile = config.get("DOCKERFILE", "Dockerfile").strip()
-docker_context = config.get("DOCKER_CONTEXT", ".").strip()
+build_context = config.get("BUILD_CONTEXT", ".").strip()
 platforms = os.environ.get("WORKFLOW_PLATFORMS", "linux/amd64,linux/arm64").strip()
 build_enabled = value("ENABLE_BUILD", "INPUT_BUILD_IMAGE", "VAR_ENABLE_BUILD", "true").lower() == "true"
 aliyun_enabled = value("ENABLE_ALIYUN_PUSH", "INPUT_PUSH_ALIYUN", "VAR_ENABLE_ALIYUN_PUSH", "true").lower() == "true"
@@ -84,7 +84,7 @@ def status(ok, missing=""):
 with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
     summary.write("# Image Make configuration\n\n")
     summary.write(f"- **Release name:** `{release_name}`\n- **Release tag:** `{tag}`\n")
-    summary.write(f"- **Dockerfile:** `{dockerfile}`\n- **Build context:** `{docker_context}`\n\n")
+    summary.write(f"- **Dockerfile:** `{dockerfile}`\n- **Build context:** `{build_context}`\n\n")
     summary.write("| Module | Status | Details |\n|---|---|---|\n")
     summary.write(f"| Build | **{status(can_build)}** | enabled: `{str(build_enabled).lower()}`, bases: `{base_amd64 or 'missing'}` / `{base_arm64 or 'missing'}` |\n")
     summary.write(f"| Primary image names | **{status(primary, ', '.join(primary_missing))}** | `{target_amd64 or 'missing'}` / `{target_arm64 or 'missing'}` |\n")
@@ -103,7 +103,7 @@ outputs = {
     "aliyun_registry": aliyun_registry, "aliyun_namespace": aliyun_namespace,
     "build_enabled": str(build_enabled).lower(), "aliyun_push_enabled": str(aliyun_enabled).lower(),
     "release_enabled": str(release_enabled).lower(), "hap_enabled": str(hap_enabled).lower(),
-    "dockerfile": dockerfile, "docker_context": docker_context,
+    "dockerfile": dockerfile, "build_context": build_context,
     "can_primary": str(primary).lower(), "can_aliyun": str(aliyun).lower(),
     "can_build": str(can_build).lower(), "can_package": str(can_package).lower(),
     "can_release": str(can_release).lower(),
