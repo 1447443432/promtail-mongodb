@@ -19,10 +19,6 @@ tag = os.environ["RELEASE_TAG"]
 release_name = os.environ["RELEASE_NAME"]
 primary = {"amd64": os.environ["TARGET_IMAGE_AMD64"], "arm64": os.environ["TARGET_IMAGE_ARM64"]}
 aliyun = {"amd64": os.environ["ALIYUN_IMAGE_AMD64"], "arm64": os.environ["ALIYUN_IMAGE_ARM64"]}
-for architecture, image in aliyun.items():
-    if not image or image == ":" + tag:
-        local_name = primary[architecture].rsplit("/", 1)[-1].rsplit(":", 1)[0]
-        aliyun[architecture] = f"{os.environ['ALIYUN_REGISTRY']}/{os.environ['ALIYUN_NAMESPACE']}/{local_name}:{tag}"
 
 base = f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/releases/download/{tag}"
 images = []

@@ -42,11 +42,6 @@ fi
 echo "[OK] docker build"
 
 aliyun_image="$ALIYUN_IMAGE_OVERRIDE"
-if [[ -z "$aliyun_image" || "$aliyun_image" == ":${TARGET_IMAGE##*:}" ]]; then
-  image_name="${TARGET_IMAGE%:*}"
-  image_name="${image_name##*/}"
-  aliyun_image="${ALIYUN_REGISTRY}/${ALIYUN_NAMESPACE}/${image_name}:${TARGET_IMAGE##*:}"
-fi
 if [[ "$PUSH_ALIYUN" == true ]]; then
   echo "========== docker push =========="
   echo "[INFO] pushing $aliyun_image..."

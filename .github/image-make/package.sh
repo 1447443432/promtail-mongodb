@@ -7,11 +7,6 @@ if [[ "$PACKAGE_MODE" == pull-release ]]; then
   printf '%s' "$ALIYUN_PASSWORD" | docker login "$ALIYUN_REGISTRY" --username "$ALIYUN_USERNAME" --password-stdin >/dev/null
   echo "[OK] Aliyun registry login"
   package_image="$ALIYUN_IMAGE"
-  if [[ -z "$package_image" || "$package_image" == ":${TARGET_IMAGE##*:}" ]]; then
-    image_name="${TARGET_IMAGE%:*}"
-    image_name="${image_name##*/}"
-    package_image="${ALIYUN_REGISTRY}/${ALIYUN_NAMESPACE}/${image_name}:${TARGET_IMAGE##*:}"
-  fi
   echo "========== docker pull =========="
   echo "[INFO] pulling $package_image..."
   pull_log="pull-${ARCHITECTURE}.log"
