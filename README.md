@@ -94,6 +94,8 @@ GitHub Actions 会根据矩阵自动传入 `TARGETARCH=amd64` 或 `TARGETARCH=ar
 
 `.image-build.env` 是项目级默认配置。它使用简单的 `KEY=VALUE` 格式，支持 `#` 注释，适合直接复制到其他项目后修改。
 
+`.github/workflows/image-make.yml` 和 `.github/image-make/` 不保存本项目的镜像仓库或 namespace；项目个性化值集中在 `.image-build.env`，因此这套 Workflow 可以直接复制到其他项目使用。
+
 配置覆盖顺序从高到低为：
 
 1. 手动 `Run workflow` 输入

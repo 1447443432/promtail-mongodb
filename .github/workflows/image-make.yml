@@ -28,13 +28,13 @@ on:
         type: boolean
       target_image_amd64:
         description: Primary amd64 image name without tag
-        required: true
-        default: registry.cn-hangzhou.aliyuncs.com/hap-mdy/hap-promtail-vlogs-mongodb-amd64
+        required: false
+        default: ''
         type: string
       target_image_arm64:
         description: Primary arm64 image name without tag
-        required: true
-        default: registry.cn-hangzhou.aliyuncs.com/hap-mdy/hap-promtail-vlogs-mongodb-arm64
+        required: false
+        default: ''
         type: string
       push_aliyun:
         description: Push image to the Aliyun registry
@@ -43,8 +43,8 @@ on:
         type: boolean
       aliyun_namespace:
         description: Aliyun namespace used to derive the target image
-        required: true
-        default: hap-mdy
+        required: false
+        default: ''
         type: string
       aliyun_image_amd64:
         description: Optional Aliyun amd64 image name without tag
@@ -69,17 +69,7 @@ on:
 
 env:
   WORKFLOW_OPERATION: ${{ github.event_name == 'push' && 'build-and-release' || inputs.operation }}
-  WORKFLOW_TAG: ${{ github.event_name == 'push' && (vars.IMAGE_TAG || '1.0.0') || inputs.tag }}
   WORKFLOW_PLATFORMS: ${{ github.event_name == 'push' && 'linux/amd64,linux/arm64' || inputs.platforms }}
-  WORKFLOW_TARGET_IMAGE_AMD64: ${{ github.event_name == 'push' && 'registry.cn-hangzhou.aliyuncs.com/hap-mdy/hap-promtail-vlogs-mongodb-amd64' || inputs.target_image_amd64 }}
-  WORKFLOW_TARGET_IMAGE_ARM64: ${{ github.event_name == 'push' && 'registry.cn-hangzhou.aliyuncs.com/hap-mdy/hap-promtail-vlogs-mongodb-arm64' || inputs.target_image_arm64 }}
-  WORKFLOW_ALIYUN_IMAGE_AMD64: ${{ github.event_name == 'push' && '' || inputs.aliyun_image_amd64 }}
-  WORKFLOW_ALIYUN_IMAGE_ARM64: ${{ github.event_name == 'push' && '' || inputs.aliyun_image_arm64 }}
-  WORKFLOW_ALIYUN_NAMESPACE: ${{ github.event_name == 'push' && 'hap-mdy' || inputs.aliyun_namespace }}
-  WORKFLOW_BUILD_IMAGE: ${{ github.event_name == 'push' && 'true' || inputs.build_image }}
-  WORKFLOW_PUSH_ALIYUN: ${{ github.event_name == 'push' && 'true' || inputs.push_aliyun }}
-  WORKFLOW_CREATE_RELEASE: ${{ github.event_name == 'push' && 'true' || inputs.create_release }}
-  WORKFLOW_NOTIFY_HAP: ${{ github.event_name == 'push' && 'true' || inputs.notify_hap }}
   REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME || secrets.ALIYUN_REGISTRY_USERNAME }}
   REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD || secrets.ALIYUN_REGISTRY_PASSWORD }}
   HAP_WEBHOOK_URL: ${{ secrets.HAP_WEBHOOK_URL }}
@@ -87,7 +77,7 @@ env:
   HAP_WEBHOOK_SIGN: ${{ secrets.HAP_WEBHOOK_SIGN }}
   BASE_REGISTRY_USERNAME: ${{ secrets.BASE_REGISTRY_USERNAME }}
   BASE_REGISTRY_PASSWORD: ${{ secrets.BASE_REGISTRY_PASSWORD }}
-  ALIYUN_REGISTRY: ${{ vars.ALIYUN_REGISTRY || 'registry.cn-hangzhou.aliyuncs.com' }}
+  ALIYUN_REGISTRY: ${{ vars.ALIYUN_REGISTRY }}
   ALIYUN_REGISTRY_USERNAME: ${{ secrets.ALIYUN_REGISTRY_USERNAME }}
   ALIYUN_REGISTRY_PASSWORD: ${{ secrets.ALIYUN_REGISTRY_PASSWORD }}
 
@@ -155,13 +145,6 @@ jobs:
           ALIYUN_REGISTRY: ${{ env.ALIYUN_REGISTRY }}
           OPERATION: ${{ env.WORKFLOW_OPERATION }}
           WORKFLOW_PLATFORMS: ${{ env.WORKFLOW_PLATFORMS }}
-          TARGET_IMAGE_AMD64: ${{ env.WORKFLOW_TARGET_IMAGE_AMD64 }}
-          TARGET_IMAGE_ARM64: ${{ env.WORKFLOW_TARGET_IMAGE_ARM64 }}
-          ALIYUN_IMAGE_AMD64: ${{ env.WORKFLOW_ALIYUN_IMAGE_AMD64 }}
-          ALIYUN_IMAGE_ARM64: ${{ env.WORKFLOW_ALIYUN_IMAGE_ARM64 }}
-          BUILD_IMAGE: ${{ env.WORKFLOW_BUILD_IMAGE }}
-          PUSH_ALIYUN: ${{ env.WORKFLOW_PUSH_ALIYUN }}
-          CREATE_RELEASE: ${{ env.WORKFLOW_CREATE_RELEASE }}
           HAP_WEBHOOK_URL: ${{ env.HAP_WEBHOOK_URL }}
         run: python3 .github/image-make/config.py
 

@@ -31,20 +31,21 @@ def value(key, input_key=None, variable_key=None, default=""):
 
 
 tag = value("IMAGE_TAG", "INPUT_TAG", "VAR_IMAGE_TAG", "1.0.0")
-release_name = value("RELEASE_NAME", None, "VAR_RELEASE_NAME", "hap-promtail-vlogs-mongodb")
+repository_name = os.environ.get("GITHUB_REPOSITORY", "image").rsplit("/", 1)[-1]
+release_name = value("RELEASE_NAME", None, "VAR_RELEASE_NAME", repository_name)
 base_amd64 = value("BASE_IMAGE_AMD64", None, "VAR_BASE_IMAGE_AMD64")
 base_arm64 = value("BASE_IMAGE_ARM64", None, "VAR_BASE_IMAGE_ARM64")
 target_amd64 = value("TARGET_IMAGE_AMD64", "INPUT_TARGET_IMAGE_AMD64", "VAR_TARGET_IMAGE_AMD64")
 target_arm64 = value("TARGET_IMAGE_ARM64", "INPUT_TARGET_IMAGE_ARM64", "VAR_TARGET_IMAGE_ARM64")
-aliyun_namespace = value("ALIYUN_NAMESPACE", "INPUT_ALIYUN_NAMESPACE", "VAR_ALIYUN_NAMESPACE", "hap-mdy")
-aliyun_registry = value("ALIYUN_REGISTRY", None, "VAR_ALIYUN_REGISTRY", "registry.cn-hangzhou.aliyuncs.com")
+aliyun_namespace = value("ALIYUN_NAMESPACE", "INPUT_ALIYUN_NAMESPACE", "VAR_ALIYUN_NAMESPACE")
+aliyun_registry = value("ALIYUN_REGISTRY", None, "VAR_ALIYUN_REGISTRY")
 aliyun_amd64 = value("ALIYUN_IMAGE_AMD64", "INPUT_ALIYUN_IMAGE_AMD64", "VAR_ALIYUN_IMAGE_AMD64")
 aliyun_arm64 = value("ALIYUN_IMAGE_ARM64", "INPUT_ALIYUN_IMAGE_ARM64", "VAR_ALIYUN_IMAGE_ARM64")
 dockerfile = config.get("DOCKERFILE", "Dockerfile").strip()
 build_context = config.get("BUILD_CONTEXT", ".").strip()
 alpine_mirror = config.get("ALPINE_MIRROR", "https://mirrors.aliyun.com/alpine").strip()
 alpine_version = config.get("ALPINE_VERSION", "3.23").strip()
-platforms = os.environ.get("WORKFLOW_PLATFORMS", "linux/amd64,linux/arm64").strip()
+platforms = (os.environ.get("WORKFLOW_PLATFORMS", "").strip() or config.get("PLATFORMS", "linux/amd64,linux/arm64").strip())
 build_enabled = value("ENABLE_BUILD", "INPUT_BUILD_IMAGE", "VAR_ENABLE_BUILD", "true").lower() == "true"
 aliyun_enabled = value("ENABLE_ALIYUN_PUSH", "INPUT_PUSH_ALIYUN", "VAR_ENABLE_ALIYUN_PUSH", "true").lower() == "true"
 release_enabled = value("ENABLE_RELEASE", "INPUT_CREATE_RELEASE", "VAR_ENABLE_RELEASE", "true").lower() == "true"
