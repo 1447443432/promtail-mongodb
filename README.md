@@ -40,7 +40,7 @@ docker push 阿里云镜像
 
 手动输入项的含义：
 
-- `tag`：GitHub Release tag，必须显式提供；镜像 Tag 分别写在各镜像地址中
+- `tag`：可选的 GitHub Release tag；留空时使用 Repository Variable 或 `.image-build.env` 的 `IMAGE_TAG`。镜像地址按原样使用
 - `platforms`：参与构建的平台，默认 `linux/amd64,linux/arm64`
 - `build_image`：构建模块开关；关闭后 `build-release` 和 `build-push-release` 不会构建
 - `push_aliyun`：阿里云推送模块开关；关闭或配置不完整时只跳过推送
@@ -158,7 +158,7 @@ GitHub Actions 会根据矩阵自动传入 `TARGETARCH=amd64` 或 `TARGETARCH=ar
 | 输入 | 默认值 | 是否必填 | 说明 |
 |---|---|---|---|
 | `operation` | `build-release` | 是 | `build-release` 构建并 Release；`pull-release` 拉取并 Release；`build-push-release` 构建、推送并 Release |
-| `tag` | 空 | 是 | GitHub Release tag；必须显式提供 |
+| `tag` | 空 | 否 | GitHub Release tag；留空时使用 Repository Variable 或 `.image-build.env` 的 `IMAGE_TAG` |
 | `platforms` | `linux/amd64,linux/arm64` | 是 | 参与构建的平台 |
 | `build_image` | `true` | 是 | 是否启用构建模块 |
 | `push_aliyun` | `false` | 是 | 是否启用阿里云 Push；还必须满足阿里云配置完整 |

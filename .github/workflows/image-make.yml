@@ -14,8 +14,8 @@ on:
         type: choice
         options: [build-release, pull-release, build-push-release]
       tag:
-        description: "GitHub Release Tag；必须显式提供"
-        required: true
+        description: "可选的 GitHub Release Tag；留空时使用 Repository Variable 或 .image-build.env 的 IMAGE_TAG"
+        required: false
         default: ''
         type: string
       platforms:
