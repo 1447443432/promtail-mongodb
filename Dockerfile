@@ -5,10 +5,11 @@ ARG BASE_IMAGE=alpine:3.23
 FROM ${BASE_IMAGE}
 
 ARG TARGETARCH
+ARG ALPINE_MIRROR=https://mirrors.aliyun.com/alpine
+ARG ALPINE_VERSION=3.23
 
-RUN echo "https://mirrors.aliyun.com/alpine/v3.23/main" > /etc/apk/repositories \
-    && echo "https://mirrors.aliyun.com/alpine/v3.23/community" >> /etc/apk/repositories \
-    && apk update \
+RUN echo "${ALPINE_MIRROR}/v${ALPINE_VERSION}/main" > /etc/apk/repositories \
+    && echo "${ALPINE_MIRROR}/v${ALPINE_VERSION}/community" >> /etc/apk/repositories \
     && apk add --no-cache \
        loki-promtail \
        ca-certificates \

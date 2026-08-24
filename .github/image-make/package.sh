@@ -2,6 +2,7 @@
 set -euo pipefail
 
 if [[ "$PACKAGE_MODE" == release ]]; then
+  printf '%s' "$ALIYUN_PASSWORD" | docker login "$ALIYUN_REGISTRY" --username "$ALIYUN_USERNAME" --password-stdin
   package_image="$ALIYUN_IMAGE"
   if [[ -z "$package_image" || "$package_image" == ":${TARGET_IMAGE##*:}" ]]; then
     image_name="${TARGET_IMAGE%:*}"

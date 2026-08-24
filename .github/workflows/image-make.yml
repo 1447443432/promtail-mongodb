@@ -111,6 +111,8 @@ jobs:
       hap_enabled: ${{ steps.check.outputs.hap_enabled }}
       dockerfile: ${{ steps.check.outputs.dockerfile }}
       build_context: ${{ steps.check.outputs.build_context }}
+      alpine_mirror: ${{ steps.check.outputs.alpine_mirror }}
+      alpine_version: ${{ steps.check.outputs.alpine_version }}
       base_image_amd64: ${{ steps.check.outputs.base_image_amd64 }}
       base_image_arm64: ${{ steps.check.outputs.base_image_arm64 }}
       can_primary: ${{ steps.check.outputs.can_primary }}
@@ -181,21 +183,6 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v6
-      - uses: docker/setup-buildx-action@v4
-      - name: Login to base image registry when credentials are configured
-        if: ${{ env.BASE_REGISTRY_USERNAME != '' && env.BASE_REGISTRY_PASSWORD != '' }}
-        env:
-          BASE_IMAGE: ${{ matrix.architecture == 'amd64' && needs.config.outputs.base_image_amd64 || needs.config.outputs.base_image_arm64 }}
-        run: |
-          registry="${BASE_IMAGE%%/*}"
-          printf '%s' "$BASE_REGISTRY_PASSWORD" | docker login "$registry" --username "$BASE_REGISTRY_USERNAME" --password-stdin
-      - name: Login to Aliyun registry
-        if: ${{ needs.config.outputs.can_aliyun == 'true' }}
-        uses: docker/login-action@v4
-        with:
-          registry: ${{ needs.config.outputs.aliyun_registry }}
-          username: ${{ env.ALIYUN_REGISTRY_USERNAME || env.REGISTRY_USERNAME }}
-          password: ${{ env.ALIYUN_REGISTRY_PASSWORD || env.REGISTRY_PASSWORD }}
       - name: Build architecture image
         env:
           ARCHITECTURE: ${{ matrix.architecture }}
@@ -205,6 +192,10 @@ jobs:
           ALIYUN_IMAGE_OVERRIDE: ${{ matrix.architecture == 'amd64' && needs.config.outputs.aliyun_image_amd64 || needs.config.outputs.aliyun_image_arm64 }}:${{ needs.config.outputs.tag }}
           ALIYUN_REGISTRY: ${{ needs.config.outputs.aliyun_registry }}
           ALIYUN_NAMESPACE: ${{ needs.config.outputs.aliyun_namespace }}
+          ALIYUN_USERNAME: ${{ env.ALIYUN_REGISTRY_USERNAME || env.REGISTRY_USERNAME }}
+          ALIYUN_PASSWORD: ${{ env.ALIYUN_REGISTRY_PASSWORD || env.REGISTRY_PASSWORD }}
+          BASE_REGISTRY_USERNAME: ${{ env.BASE_REGISTRY_USERNAME }}
+          BASE_REGISTRY_PASSWORD: ${{ env.BASE_REGISTRY_PASSWORD }}
           BASE_IMAGE: ${{ matrix.architecture == 'amd64' && needs.config.outputs.base_image_amd64 || needs.config.outputs.base_image_arm64 }}
           PUSH_ALIYUN: ${{ needs.config.outputs.can_aliyun }}
           RELEASE_ENABLED: ${{ needs.config.outputs.release_enabled }}
@@ -212,6 +203,8 @@ jobs:
           RELEASE_TAG: ${{ needs.config.outputs.tag }}
           DOCKERFILE: ${{ needs.config.outputs.dockerfile }}
           BUILD_CONTEXT: ${{ needs.config.outputs.build_context }}
+          ALPINE_MIRROR: ${{ needs.config.outputs.alpine_mirror }}
+          ALPINE_VERSION: ${{ needs.config.outputs.alpine_version }}
         run: bash .github/image-make/build.sh
       - name: Upload locally built image package
         if: ${{ needs.config.outputs.release_enabled == 'true' }}
@@ -245,15 +238,6 @@ jobs:
         with:
           name: release-${{ matrix.architecture }}
           path: release-assets
-      - uses: docker/setup-buildx-action@v4
-        if: ${{ github.event_name != 'push' && inputs.operation == 'release' }}
-      - name: Login to Aliyun registry
-        if: ${{ github.event_name != 'push' && inputs.operation == 'release' && needs.config.outputs.can_aliyun == 'true' }}
-        uses: docker/login-action@v4
-        with:
-          registry: ${{ needs.config.outputs.aliyun_registry }}
-          username: ${{ env.ALIYUN_REGISTRY_USERNAME || env.REGISTRY_USERNAME }}
-          password: ${{ env.ALIYUN_REGISTRY_PASSWORD || env.REGISTRY_PASSWORD }}
       - name: Package or verify architecture image
         env:
           PACKAGE_MODE: ${{ github.event_name == 'push' && 'verify' || inputs.operation }}
@@ -262,6 +246,8 @@ jobs:
           ALIYUN_IMAGE: ${{ matrix.architecture == 'amd64' && needs.config.outputs.aliyun_image_amd64 || needs.config.outputs.aliyun_image_arm64 }}:${{ needs.config.outputs.tag }}
           ALIYUN_REGISTRY: ${{ needs.config.outputs.aliyun_registry }}
           ALIYUN_NAMESPACE: ${{ needs.config.outputs.aliyun_namespace }}
+          ALIYUN_USERNAME: ${{ env.ALIYUN_REGISTRY_USERNAME || env.REGISTRY_USERNAME }}
+          ALIYUN_PASSWORD: ${{ env.ALIYUN_REGISTRY_PASSWORD || env.REGISTRY_PASSWORD }}
           RELEASE_NAME: ${{ needs.config.outputs.release_name }}
           RELEASE_TAG: ${{ needs.config.outputs.tag }}
         run: bash .github/image-make/package.sh

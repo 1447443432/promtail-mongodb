@@ -1,6 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+if [[ -n "${BASE_REGISTRY_USERNAME:-}" && -n "${BASE_REGISTRY_PASSWORD:-}" ]]; then
+  base_registry="${BASE_IMAGE%%/*}"
+  printf '%s' "$BASE_REGISTRY_PASSWORD" | docker login "$base_registry" --username "$BASE_REGISTRY_USERNAME" --password-stdin
+fi
+
+if [[ "$PUSH_ALIYUN" == true ]]; then
+  printf '%s' "$ALIYUN_PASSWORD" | docker login "$ALIYUN_REGISTRY" --username "$ALIYUN_USERNAME" --password-stdin
+fi
+
 builder="image-make-${ARCHITECTURE}"
 if ! docker buildx inspect "$builder" >/dev/null 2>&1; then
   docker buildx create --name "$builder" --driver docker-container --use
@@ -12,6 +21,8 @@ docker buildx build --builder "$builder" \
   --platform "$PLATFORM" \
   --build-arg TARGETARCH="$ARCHITECTURE" \
   --build-arg BASE_IMAGE="$BASE_IMAGE" \
+  --build-arg ALPINE_MIRROR="$ALPINE_MIRROR" \
+  --build-arg ALPINE_VERSION="$ALPINE_VERSION" \
   --file "$DOCKERFILE" \
   --tag "$TARGET_IMAGE" \
   --load "$BUILD_CONTEXT"

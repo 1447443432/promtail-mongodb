@@ -130,3 +130,10 @@ ENABLE_HAP_WEBHOOK
 ```
 
 `RELEASE_NAME` 写入 Release manifest。压缩包名称会根据镜像最后一段和 tag 自动生成，例如 `hap-promtail-vlogs-mongodb-amd64_1.0.0.tar.gz`。构建上下文配置项使用 `BUILD_CONTEXT`，不要命名为 Docker 保留的 `DOCKER_CONTEXT`。复制这套 Workflow 到其他项目时，只需要修改 `.image-build.env`、Dockerfile 和必要的镜像配置，不需要把 CI 脚本混入项目业务 `scripts/`。
+
+Alpine 软件源由 `ALPINE_MIRROR` 和 `ALPINE_VERSION` 控制，默认使用阿里云源和 `3.23`。如果某个 Runner 访问阿里云源较慢，可以在 `.image-build.env` 中切换，例如：
+
+```bash
+ALPINE_MIRROR=https://dl-cdn.alpinelinux.org/alpine
+ALPINE_VERSION=3.23
+```

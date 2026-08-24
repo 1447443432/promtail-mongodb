@@ -42,6 +42,8 @@ aliyun_amd64 = value("ALIYUN_IMAGE_AMD64", "INPUT_ALIYUN_IMAGE_AMD64", "VAR_ALIY
 aliyun_arm64 = value("ALIYUN_IMAGE_ARM64", "INPUT_ALIYUN_IMAGE_ARM64", "VAR_ALIYUN_IMAGE_ARM64")
 dockerfile = config.get("DOCKERFILE", "Dockerfile").strip()
 build_context = config.get("BUILD_CONTEXT", ".").strip()
+alpine_mirror = config.get("ALPINE_MIRROR", "https://mirrors.aliyun.com/alpine").strip()
+alpine_version = config.get("ALPINE_VERSION", "3.23").strip()
 platforms = os.environ.get("WORKFLOW_PLATFORMS", "linux/amd64,linux/arm64").strip()
 build_enabled = value("ENABLE_BUILD", "INPUT_BUILD_IMAGE", "VAR_ENABLE_BUILD", "true").lower() == "true"
 aliyun_enabled = value("ENABLE_ALIYUN_PUSH", "INPUT_PUSH_ALIYUN", "VAR_ENABLE_ALIYUN_PUSH", "true").lower() == "true"
@@ -104,6 +106,7 @@ outputs = {
     "build_enabled": str(build_enabled).lower(), "aliyun_push_enabled": str(aliyun_enabled).lower(),
     "release_enabled": str(release_enabled).lower(), "hap_enabled": str(hap_enabled).lower(),
     "dockerfile": dockerfile, "build_context": build_context,
+    "alpine_mirror": alpine_mirror, "alpine_version": alpine_version,
     "can_primary": str(primary).lower(), "can_aliyun": str(aliyun).lower(),
     "can_build": str(can_build).lower(), "can_package": str(can_package).lower(),
     "can_release": str(can_release).lower(),
