@@ -29,12 +29,12 @@ on:
         default: true
         type: boolean
       target_image_amd64:
-        description: "主 amd64 镜像完整地址，必须包含 Tag"
+        description: "主 amd64 镜像地址；原样使用，不会自动追加 Tag"
         required: false
         default: ''
         type: string
       target_image_arm64:
-        description: "主 arm64 镜像完整地址，必须包含 Tag"
+        description: "主 arm64 镜像地址；原样使用，不会自动追加 Tag"
         required: false
         default: ''
         type: string
@@ -49,13 +49,13 @@ on:
         default: ''
         type: string
       aliyun_image_amd64:
-        description: "可选的阿里云 amd64 完整镜像地址，必须包含 Tag"
-        required: true
+        description: "可选的阿里云 amd64 镜像地址；原样使用，不会自动追加 Tag"
+        required: false
         default: ''
         type: string
       aliyun_image_arm64:
-        description: "可选的阿里云 arm64 完整镜像地址，必须包含 Tag"
-        required: true
+        description: "可选的阿里云 arm64 镜像地址；原样使用，不会自动追加 Tag"
+        required: false
         default: ''
         type: string
       create_release:

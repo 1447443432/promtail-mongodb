@@ -30,11 +30,6 @@ def value(key, input_key=None, variable_key=None, default=""):
     return config.get(key, default).strip()
 
 
-def has_tag(value):
-    last_part = value.rsplit("/", 1)[-1]
-    return ":" in last_part
-
-
 tag = value("IMAGE_TAG", "INPUT_TAG", "VAR_IMAGE_TAG")
 tag_missing = not tag
 repository_name = os.environ.get("GITHUB_REPOSITORY", "image").rsplit("/", 1)[-1]
@@ -61,7 +56,7 @@ primary_missing = [
     name for name, item in (
         ("TARGET_IMAGE_AMD64", target_amd64),
         ("TARGET_IMAGE_ARM64", target_arm64),
-    ) if not item or not has_tag(item)
+    ) if not item
 ]
 primary = not primary_missing
 aliyun_user = os.environ.get("ALIYUN_USERNAME", "").strip()
@@ -74,7 +69,7 @@ aliyun_missing = [
         ("ALIYUN_PASSWORD", aliyun_password),
         ("ALIYUN_IMAGE_AMD64", aliyun_amd64),
         ("ALIYUN_IMAGE_ARM64", aliyun_arm64),
-    ) if not item or (name.startswith("ALIYUN_IMAGE_") and not has_tag(item))]
+    ) if not item]
 aliyun = aliyun_enabled and not aliyun_missing and primary
 base = bool(base_amd64 and base_arm64)
 can_build = build_enabled and primary and base and not tag_missing
