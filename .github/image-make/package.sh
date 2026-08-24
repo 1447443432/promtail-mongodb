@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [[ "$PACKAGE_MODE" == release-only ]]; then
+if [[ "$PACKAGE_MODE" == pull-release ]]; then
   echo "========== Aliyun registry login =========="
   echo "[INFO] logging in to Aliyun registry..."
   printf '%s' "$ALIYUN_PASSWORD" | docker login "$ALIYUN_REGISTRY" --username "$ALIYUN_USERNAME" --password-stdin >/dev/null
@@ -47,7 +47,7 @@ echo "PACKAGE SUCCESS"
   echo "## Package $ARCHITECTURE summary"
   echo
   echo "- **Mode:** \`$PACKAGE_MODE\`"
-  if [[ "$PACKAGE_MODE" == release-only ]]; then
+  if [[ "$PACKAGE_MODE" == pull-release ]]; then
     echo "- **Source image:** \`$package_image\`"
   else
     echo "- **Source:** build job artifact \`release-$ARCHITECTURE\`"

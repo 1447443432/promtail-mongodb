@@ -32,17 +32,17 @@ docker push 阿里云镜像
 
 使用 `Actions → Image Make → Run workflow` 时，`operation` 请选择以下模式之一：
 
-- `build-only`：构建 amd64/arm64 镜像、生成压缩包和 SHA256，并创建 GitHub Release；默认不推送阿里云。
-- `build-and-release`：构建镜像、按配置推送阿里云、打包并创建 GitHub Release。
-- `release-only`：不重新构建，从已配置的阿里云镜像拉取对应架构镜像，打包并创建 GitHub Release。
+- `build-release`：构建 amd64/arm64 镜像、生成压缩包和 SHA256，并创建 GitHub Release。
+- `pull-release`：不重新构建，使用已有阿里云镜像打包并创建 GitHub Release。
+- `build-push-release`：构建镜像、推送阿里云、打包并创建 GitHub Release。
 
-这里的 `push` 仅表示 GitHub 的自动提交触发事件，不是手动运行模式。提交到 `master` 时，Workflow 默认执行 `build-and-release`；仅修改 `agents/` 时不会触发。
+这里的 `push` 仅表示 GitHub 的自动提交触发事件，不是手动运行模式。提交到 `master` 时，Workflow 默认执行 `build-push-release`；仅修改 `agents/` 时不会触发。
 
 手动输入项的含义：
 
 - `tag`：镜像 tag 和 GitHub Release tag
 - `platforms`：参与构建的平台，默认 `linux/amd64,linux/arm64`
-- `build_image`：构建模块开关；关闭后 `build-only` 和 `build-and-release` 不会构建
+- `build_image`：构建模块开关；关闭后 `build-release` 和 `build-push-release` 不会构建
 - `push_aliyun`：阿里云推送模块开关；关闭或配置不完整时只跳过推送
 - `create_release`：Release 模块开关；关闭后不会打包上传 Release
 - `notify_hap`：HAP Webhook 通知模块开关；关闭或 URL 为空时只跳过通知
@@ -50,7 +50,7 @@ docker push 阿里云镜像
 - `aliyun_namespace`：覆盖阿里云命名空间
 - `aliyun_image_amd64`、`aliyun_image_arm64`：覆盖阿里云目标镜像名，不含 tag
 
-`release-only` 需要提前存在可拉取的阿里云镜像和完整的阿里云凭据。如果只想构建而不创建 Release，可将 `create_release` 关闭；`build-only` 本身会创建 Release。
+`pull-release` 需要提前存在可拉取的阿里云镜像和完整的阿里云凭据。如果只想构建而不创建 Release，可将 `create_release` 关闭；`build-release` 本身会创建 Release。
 
 tag 默认是 `1.0.0`。手动运行时可修改 Workflow 输入；自动提交时可配置 Repository Variable `IMAGE_TAG`。
 
@@ -157,7 +157,7 @@ GitHub Actions 会根据矩阵自动传入 `TARGETARCH=amd64` 或 `TARGETARCH=ar
 
 | 输入 | 默认值 | 是否必填 | 说明 |
 |---|---|---|---|
-| `operation` | `build-and-release` | 是 | `build-only` 构建并 Release；`build-and-release` 构建、推送并 Release；`release-only` 拉取并 Release |
+| `operation` | `build-release` | 是 | `build-release` 构建并 Release；`pull-release` 拉取并 Release；`build-push-release` 构建、推送并 Release |
 | `tag` | `1.0.0` | 是 | 镜像 tag 和 Release tag |
 | `platforms` | `linux/amd64,linux/arm64` | 是 | 参与构建的平台 |
 | `build_image` | `true` | 是 | 是否启用构建模块 |
@@ -268,7 +268,7 @@ Secrets 用于敏感配置。在 `Settings → Secrets and variables → Actions
    ENABLE_HAP_WEBHOOK=true
    ```
 
-4. 运行 `build-and-release`，Release 成功后才会执行 HAP 通知。
+4. 运行 `build-release` 或 `build-push-release`，Release 成功后才会执行 HAP 通知。
 
 请求头和请求体如下：
 
@@ -299,9 +299,9 @@ Repository Secrets:
 
 建议按以下顺序验证：
 
-1. 先用 `build-only` 验证两个架构构建、打包和 Release。
-2. 配置阿里云后用 `build-and-release` 验证 Tag、Push 和 Release 附件。
-3. 配置 HAP 后再次运行 `build-and-release`，检查 Release Job 的 `HAP sync` 和通知步骤。
+1. 先用 `build-release` 验证两个架构构建、打包和 Release。
+2. 配置阿里云后用 `build-push-release` 验证 Tag、Push 和 Release 附件。
+3. 配置 HAP 后再次运行 `build-release` 或 `build-push-release`，检查 Release Job 的 `HAP sync` 和通知步骤。
 4. 检查 HAP 接收到的 `repository`、`version`、两个架构下载地址和 SHA256 是否正确。
 
 如果某个可选模块没有配置，不要根据灰色步骤判断失败；查看 `Check module configuration` 和 `Release` 的 Actions Summary，其中会写明模块是关闭、缺少哪些配置，还是执行成功。

@@ -13,7 +13,7 @@ metadata:
 
 该 Skill 面向“项目内自包含”的 Workflow：不要默认引入外部共享 Workflow、Reusable Workflow 或公共配置仓库。CI 辅助脚本应放在项目的 `.github/image-make/`，不要污染已有的业务 `scripts/` 目录。
 
-三种运行模式必须保持语义一致：`build-only` 构建并打包创建 Release（默认不推送阿里云），`build-and-release` 构建、按配置推送阿里云并创建 Release，`release-only` 不构建而从已有阿里云镜像拉取后创建 Release。
+三种运行模式必须保持语义一致：`build-release` 构建并打包创建 Release，`pull-release` 不构建而从已有阿里云镜像拉取后创建 Release，`build-push-release` 构建、推送阿里云并创建 Release。
 
 ## 何时使用
 
@@ -159,7 +159,7 @@ Summary 中不得输出密码、Token、Webhook 签名或完整 Secret 值。
 - Python `ast.parse` 或等价语法检查
 - `bash -n` 检查 CI Shell 脚本
 - `git diff --check`
-- 检查 Workflow 行为：push 触发、手动 build-only、手动 build-and-release、release-only、Aliyun 缺配置、HAP URL 缺失
+- 检查 Workflow 行为：push 触发、手动 build-release、手动 pull-release、手动 build-push-release、Aliyun 缺配置、HAP URL 缺失
 - 对 Workflow 和 CI 脚本执行通用性审计，确认没有残留当前项目默认值
 - 如本机没有 Docker，明确说明未执行真实镜像构建，不要声称构建已验证
 

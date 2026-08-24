@@ -8,11 +8,11 @@ on:
   workflow_dispatch:
     inputs:
       operation:
-        description: "运行模式：build-only=构建、打包并创建 Release；release-only=使用已有阿里云镜像打包并创建 Release；build-and-release=构建、推送、打包并创建 Release"
+        description: "运行模式：build-release=构建、打包并创建 Release；pull-release=使用已有阿里云镜像打包并创建 Release；build-push-release=构建、推送阿里云、打包并创建 Release"
         required: true
-        default: build-and-release
+        default: build-release
         type: choice
-        options: [build-only, release-only, build-and-release]
+        options: [build-release, pull-release, build-push-release]
       tag:
         description: "镜像 Tag 和 GitHub Release Tag；默认为 1.0.0"
         required: true
@@ -24,7 +24,7 @@ on:
         default: linux/amd64,linux/arm64
         type: string
       build_image:
-        description: "构建模块开关；关闭后 build-only 和 build-and-release 不会构建镜像"
+        description: "构建模块开关；关闭后 build-release 和 build-push-release 不会构建镜像"
         required: true
         default: true
         type: boolean
@@ -70,7 +70,7 @@ on:
         type: boolean
 
 env:
-  WORKFLOW_OPERATION: ${{ github.event_name == 'push' && 'build-and-release' || inputs.operation }}
+  WORKFLOW_OPERATION: ${{ github.event_name == 'push' && 'build-push-release' || inputs.operation }}
   WORKFLOW_PLATFORMS: ${{ github.event_name == 'push' && 'linux/amd64,linux/arm64' || inputs.platforms }}
   REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME || secrets.ALIYUN_REGISTRY_USERNAME }}
   REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD || secrets.ALIYUN_REGISTRY_PASSWORD }}
@@ -152,7 +152,7 @@ jobs:
 
   build:
     needs: config
-    if: ${{ needs.config.outputs.can_build == 'true' && (github.event_name == 'push' || inputs.operation != 'release-only') }}
+    if: ${{ needs.config.outputs.can_build == 'true' && (github.event_name == 'push' || inputs.operation != 'pull-release') }}
     strategy:
       fail-fast: false
       matrix:
@@ -201,7 +201,7 @@ jobs:
 
   package:
     needs: [config, build]
-    if: ${{ always() && needs.config.outputs.can_package == 'true' && ((github.event_name == 'push' && needs.build.result == 'success') || (github.event_name != 'push' && (((inputs.operation == 'build-only' || inputs.operation == 'build-and-release') && needs.build.result == 'success') || (inputs.operation == 'release-only' && needs.build.result == 'skipped')))) }}
+    if: ${{ always() && needs.config.outputs.can_package == 'true' && ((github.event_name == 'push' && needs.build.result == 'success') || (github.event_name != 'push' && (((inputs.operation == 'build-release' || inputs.operation == 'build-push-release') && needs.build.result == 'success') || (inputs.operation == 'pull-release' && needs.build.result == 'skipped')))) }}
     strategy:
       fail-fast: false
       matrix:
@@ -218,7 +218,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - name: Download packages from build jobs
-        if: ${{ github.event_name == 'push' || inputs.operation == 'build-only' || inputs.operation == 'build-and-release' }}
+        if: ${{ github.event_name == 'push' || inputs.operation == 'build-release' || inputs.operation == 'build-push-release' }}
         uses: actions/download-artifact@v8
         with:
           name: release-${{ matrix.architecture }}
@@ -236,8 +236,8 @@ jobs:
           RELEASE_NAME: ${{ needs.config.outputs.release_name }}
           RELEASE_TAG: ${{ needs.config.outputs.tag }}
         run: bash .github/image-make/package.sh
-      - name: Upload release-only package
-        if: ${{ github.event_name != 'push' && inputs.operation == 'release-only' }}
+      - name: Upload pull-release package
+        if: ${{ github.event_name != 'push' && inputs.operation == 'pull-release' }}
         uses: actions/upload-artifact@v7
         with:
           name: release-${{ matrix.architecture }}
@@ -246,7 +246,7 @@ jobs:
 
   release:
     needs: [config, build, package]
-    if: ${{ always() && needs.config.outputs.can_release == 'true' && ((github.event_name == 'push' && needs.build.result == 'success' && needs.package.result == 'success') || (github.event_name != 'push' && (((inputs.operation == 'build-only' || inputs.operation == 'build-and-release') && needs.build.result == 'success' && needs.package.result == 'success') || (inputs.operation == 'release-only' && needs.package.result == 'success')))) }}
+    if: ${{ always() && needs.config.outputs.can_release == 'true' && ((github.event_name == 'push' && needs.build.result == 'success' && needs.package.result == 'success') || (github.event_name != 'push' && (((inputs.operation == 'build-release' || inputs.operation == 'build-push-release') && needs.build.result == 'success' && needs.package.result == 'success') || (inputs.operation == 'pull-release' && needs.package.result == 'success')))) }}
     runs-on: ubuntu-24.04
     permissions:
       contents: write
