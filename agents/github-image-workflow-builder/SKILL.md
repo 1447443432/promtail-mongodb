@@ -151,7 +151,7 @@ Summary 中不得输出密码、Token、Webhook 签名或完整 Secret 值。
 - Python `ast.parse` 或等价语法检查
 - `bash -n` 检查 CI Shell 脚本
 - `git diff --check`
-- 检查 Workflow 行为：push、手动 build、手动 build-and-release、release-only、Aliyun 缺配置、HAP URL 缺失
+- 检查 Workflow 行为：push 触发、手动 build-only、手动 build-and-release、release-only、Aliyun 缺配置、HAP URL 缺失
 - 对 Workflow 和 CI 脚本执行通用性审计，确认没有残留当前项目默认值
 - 如本机没有 Docker，明确说明未执行真实镜像构建，不要声称构建已验证
 

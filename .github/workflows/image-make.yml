@@ -8,11 +8,11 @@ on:
   workflow_dispatch:
     inputs:
       operation:
-        description: build, release, or build-and-release
+        description: Mode: build-only, release-only, or build-and-release
         required: true
         default: build-and-release
         type: choice
-        options: [build, release, build-and-release]
+        options: [build-only, release-only, build-and-release]
       tag:
         description: Image tag and GitHub Release tag
         required: true
@@ -24,7 +24,7 @@ on:
         default: linux/amd64,linux/arm64
         type: string
       build_image:
-        description: Build the Docker image
+        description: Enable image build module (build-only/build-and-release)
         required: true
         default: true
         type: boolean
@@ -39,7 +39,7 @@ on:
         default: ''
         type: string
       push_aliyun:
-        description: Push image to the Aliyun registry
+        description: Enable Aliyun image push after build
         required: true
         default: false
         type: boolean
@@ -59,12 +59,12 @@ on:
         default: ''
         type: string
       create_release:
-        description: Create GitHub Release packages
+        description: Enable GitHub Release package creation
         required: true
         default: true
         type: boolean
       notify_hap:
-        description: Notify HAP Webhook after Release
+        description: Enable HAP Webhook notification after Release
         required: true
         default: false
         type: boolean
@@ -152,7 +152,7 @@ jobs:
 
   build:
     needs: config
-    if: ${{ needs.config.outputs.can_build == 'true' && (github.event_name == 'push' || inputs.operation != 'release') }}
+    if: ${{ needs.config.outputs.can_build == 'true' && (github.event_name == 'push' || inputs.operation != 'release-only') }}
     strategy:
       fail-fast: false
       matrix:
@@ -201,7 +201,7 @@ jobs:
 
   package:
     needs: [config, build]
-    if: ${{ always() && needs.config.outputs.can_package == 'true' && ((github.event_name == 'push' && needs.build.result == 'success') || (github.event_name != 'push' && ((inputs.operation == 'build-and-release' && needs.build.result == 'success') || (inputs.operation == 'release' && needs.build.result == 'skipped')))) }}
+    if: ${{ always() && needs.config.outputs.can_package == 'true' && ((github.event_name == 'push' && needs.build.result == 'success') || (github.event_name != 'push' && ((inputs.operation == 'build-and-release' && needs.build.result == 'success') || (inputs.operation == 'release-only' && needs.build.result == 'skipped')))) }}
     strategy:
       fail-fast: false
       matrix:
@@ -237,7 +237,7 @@ jobs:
           RELEASE_TAG: ${{ needs.config.outputs.tag }}
         run: bash .github/image-make/package.sh
       - name: Upload release-only package
-        if: ${{ github.event_name != 'push' && inputs.operation == 'release' }}
+        if: ${{ github.event_name != 'push' && inputs.operation == 'release-only' }}
         uses: actions/upload-artifact@v7
         with:
           name: release-${{ matrix.architecture }}
@@ -246,7 +246,7 @@ jobs:
 
   release:
     needs: [config, build, package]
-    if: ${{ always() && needs.config.outputs.can_release == 'true' && ((github.event_name == 'push' && needs.build.result == 'success' && needs.package.result == 'success') || (github.event_name != 'push' && ((inputs.operation == 'build-and-release' && needs.build.result == 'success' && needs.package.result == 'success') || (inputs.operation == 'release' && needs.package.result == 'success')))) }}
+    if: ${{ always() && needs.config.outputs.can_release == 'true' && ((github.event_name == 'push' && needs.build.result == 'success' && needs.package.result == 'success') || (github.event_name != 'push' && ((inputs.operation == 'build-and-release' && needs.build.result == 'success' && needs.package.result == 'success') || (inputs.operation == 'release-only' && needs.package.result == 'success')))) }}
     runs-on: ubuntu-24.04
     permissions:
       contents: write

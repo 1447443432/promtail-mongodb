@@ -51,7 +51,7 @@
 - [ ] Release Summary 展示镜像、Archive、SHA256、下载链接
 - [ ] Summary 不包含 Secret
 - [ ] 检查 push
-- [ ] 检查手动 build
+- [ ] 检查手动 build-only
 - [ ] 检查手动 build-and-release
 - [ ] 检查 release-only
 - [ ] 检查 Aliyun 缺账号密码

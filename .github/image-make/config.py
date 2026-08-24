@@ -58,7 +58,7 @@ aliyun = aliyun_enabled and bool(aliyun_registry and aliyun_namespace and aliyun
 base = bool(base_amd64 and base_arm64)
 can_build = build_enabled and primary and base
 operation = os.environ.get("OPERATION", "build-and-release")
-can_package = release_enabled and (aliyun if operation == "release" else can_build)
+can_package = release_enabled and operation in ("build-and-release", "release-only") and (aliyun if operation == "release-only" else can_build)
 can_release = can_package
 
 primary_missing = [name for name, item in (("TARGET_IMAGE_AMD64", target_amd64), ("TARGET_IMAGE_ARM64", target_arm64)) if not item]
@@ -86,7 +86,7 @@ def status(ok, missing=""):
 
 with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
     summary.write("# Image Make configuration\n\n")
-    summary.write(f"- **Release name:** `{release_name}`\n- **Release tag:** `{tag}`\n")
+    summary.write(f"- **Operation:** `{operation}`\n- **Release name:** `{release_name}`\n- **Release tag:** `{tag}`\n")
     summary.write(f"- **Dockerfile:** `{dockerfile}`\n- **Build context:** `{build_context}`\n\n")
     summary.write("| Module | Status | Details |\n|---|---|---|\n")
     summary.write(f"| Build | **{status(can_build)}** | enabled: `{str(build_enabled).lower()}`, bases: `{base_amd64 or 'missing'}` / `{base_arm64 or 'missing'}` |\n")

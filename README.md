@@ -28,12 +28,29 @@ docker push 阿里云镜像
 
 没有配置阿里云地址或账号密码时，只跳过阿里云 Push；构建仍然执行，Release 使用主镜像打包。配置阿里云后，Release 优先从阿里云镜像打包。
 
-使用 `Actions → Image Make → Run workflow`，可控制：
+## Workflow 运行模式
 
-- `build_image`：是否构建镜像
-- `push_aliyun`：是否推送阿里云
-- `create_release`：是否创建 GitHub Release
-- `notify_hap`：是否通知 HAP Webhook
+使用 `Actions → Image Make → Run workflow` 时，`operation` 请选择以下模式之一：
+
+- `build-only`：只构建 amd64/arm64 镜像，并上传构建产物；不创建 GitHub Release。
+- `build-and-release`：构建镜像、按配置推送阿里云、打包并创建 GitHub Release。
+- `release-only`：不重新构建，从已配置的阿里云镜像拉取对应架构镜像，打包并创建 GitHub Release。
+
+这里的 `push` 仅表示 GitHub 的自动提交触发事件，不是手动运行模式。提交到 `master` 时，Workflow 默认执行 `build-and-release`；仅修改 `agents/` 时不会触发。
+
+手动输入项的含义：
+
+- `tag`：镜像 tag 和 GitHub Release tag
+- `platforms`：参与构建的平台，默认 `linux/amd64,linux/arm64`
+- `build_image`：构建模块开关；关闭后 `build-only` 和 `build-and-release` 不会构建
+- `push_aliyun`：阿里云推送模块开关；关闭或配置不完整时只跳过推送
+- `create_release`：Release 模块开关；关闭后不会打包上传 Release
+- `notify_hap`：HAP Webhook 通知模块开关；关闭或 URL 为空时只跳过通知
+- `target_image_amd64`、`target_image_arm64`：覆盖两个架构的主镜像名，不含 tag
+- `aliyun_namespace`：覆盖阿里云命名空间
+- `aliyun_image_amd64`、`aliyun_image_arm64`：覆盖阿里云目标镜像名，不含 tag
+
+`release-only` 需要提前存在可拉取的阿里云镜像和完整的阿里云凭据；如果只想验证构建，请选择 `build-only`。
 
 tag 默认是 `1.0.0`。手动运行时可修改 Workflow 输入；自动提交时可配置 Repository Variable `IMAGE_TAG`。
 
