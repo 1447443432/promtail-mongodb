@@ -42,15 +42,29 @@ for path in sorted(glob.glob("release-assets/*.tar.gz")):
         "download_url": f"{base}/{archive}",
     })
 
-published = list(aliyun.values()) if os.environ["PUSH_ALIYUN"] == "true" else []
+by_architecture = {item["architecture"]: item for item in images}
+release_url = f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/releases/tag/{tag}"
+attachment_urls = [item["download_url"] for item in images]
+
+# Keep the HAP payload compatible with nginx-make. The attachment_urls field is
+# intentionally a JSON string because this is how the HAP Webhook field is stored.
 manifest = {
-    "event": "image_release_ready",
-    "release_name": release_name,
-    "release_tag": tag,
-    "image": images[0]["image"] if images else "",
-    "published_images": published,
-    "platforms": os.environ["PLATFORMS"].split(","),
-    "images": images,
+    "project_name": release_name,
+    "repository": os.environ["GITHUB_REPOSITORY"],
+    "version": tag,
+    "tag": tag,
+    "release_url": release_url,
+    "amd64_name": by_architecture.get("amd64", {}).get("archive", ""),
+    "amd64_url": by_architecture.get("amd64", {}).get("download_url", ""),
+    "amd64_sha256": by_architecture.get("amd64", {}).get("sha256", ""),
+    "arm64_name": by_architecture.get("arm64", {}).get("archive", ""),
+    "arm64_url": by_architecture.get("arm64", {}).get("download_url", ""),
+    "arm64_sha256": by_architecture.get("arm64", {}).get("sha256", ""),
+    "attachment_urls": json.dumps(attachment_urls, ensure_ascii=False),
+    "commit_sha": os.environ.get("GITHUB_SHA", ""),
+    "run_id": os.environ.get("GITHUB_RUN_ID", ""),
+    "run_url": f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ.get('GITHUB_RUN_ID', '')}",
+    "build_status": "success",
 }
 with open("release-assets/release-manifest.json", "w", encoding="utf-8") as output:
     json.dump(manifest, output, indent=2)

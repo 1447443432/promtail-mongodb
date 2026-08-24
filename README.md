@@ -91,6 +91,8 @@ HAP 配置：
 
 HAP URL 为空时跳过通知，并在 Actions Summary 中说明原因。
 
+HAP Webhook 的请求体与 nginx-make 保持一致，包含 `project_name`、`repository`、`version`、`tag`、`release_url`、amd64/arm64 的附件名称、下载地址和 SHA256，以及 `attachment_urls`、`commit_sha`、`run_id`、`run_url`、`build_status`。其中 `attachment_urls` 按 HAP 约定以 JSON 字符串传递多个下载地址。请求仍使用 `Content-Type: application/json`，并按配置附带 `AppKey`、`Sign` 请求头。
+
 ## 手动 Docker 构建
 
 Dockerfile 兼容直接手动构建，默认使用官方多架构 `alpine:3.23`：
