@@ -8,63 +8,63 @@ on:
   workflow_dispatch:
     inputs:
       operation:
-        description: "Mode: build-only, release-only, or build-and-release"
+        description: "运行模式：build-only=只构建；release-only=使用已有阿里云镜像打包并创建 Release；build-and-release=构建、推送、打包并创建 Release"
         required: true
         default: build-and-release
         type: choice
         options: [build-only, release-only, build-and-release]
       tag:
-        description: Image tag and GitHub Release tag
+        description: "镜像 Tag 和 GitHub Release Tag；默认为 1.0.0"
         required: true
         default: 1.0.0
         type: string
       platforms:
-        description: Comma-separated platforms
+        description: "构建平台，多个平台用逗号分隔；默认 linux/amd64,linux/arm64"
         required: true
         default: linux/amd64,linux/arm64
         type: string
       build_image:
-        description: Enable image build module (build-only/build-and-release)
+        description: "构建模块开关；关闭后 build-only 和 build-and-release 不会构建镜像"
         required: true
         default: true
         type: boolean
       target_image_amd64:
-        description: Primary amd64 image name without tag
+        description: "主 amd64 镜像名，不包含 Tag；为空时使用项目配置文件或 Repository Variable"
         required: false
         default: ''
         type: string
       target_image_arm64:
-        description: Primary arm64 image name without tag
+        description: "主 arm64 镜像名，不包含 Tag；为空时使用项目配置文件或 Repository Variable"
         required: false
         default: ''
         type: string
       push_aliyun:
-        description: Enable Aliyun image push after build
+        description: "阿里云推送模块开关；需要同时配置 Registry、命名空间和账号密码"
         required: true
         default: false
         type: boolean
       aliyun_namespace:
-        description: Aliyun namespace used to derive the target image
+        description: "阿里云命名空间；用于自动生成阿里云目标镜像名"
         required: false
         default: ''
         type: string
       aliyun_image_amd64:
-        description: Optional Aliyun amd64 image name without tag
+        description: "可选的阿里云 amd64 镜像名，不包含 Tag；为空时根据主镜像名自动生成"
         required: true
         default: ''
         type: string
       aliyun_image_arm64:
-        description: Optional Aliyun arm64 image name without tag
+        description: "可选的阿里云 arm64 镜像名，不包含 Tag；为空时根据主镜像名自动生成"
         required: true
         default: ''
         type: string
       create_release:
-        description: Enable GitHub Release package creation
+        description: "GitHub Release 开关；开启后上传 amd64/arm64 镜像压缩包和 SHA256"
         required: true
         default: true
         type: boolean
       notify_hap:
-        description: Enable HAP Webhook notification after Release
+        description: "HAP Webhook 通知开关；需要同时配置 HAP_WEBHOOK_URL，Release 成功后发送"
         required: true
         default: false
         type: boolean
