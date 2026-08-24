@@ -38,15 +38,15 @@ metadata:
    - 不在 amd64 Runner 上用 QEMU 代替原生 arm64，除非用户明确要求
 3. 基础镜像按架构独立配置：`BASE_IMAGE_AMD64` 和 `BASE_IMAGE_ARM64` 可以完全不同，不能通过字符串替换猜测 arm64 镜像。
 4. Dockerfile 保持手动可构建：默认值应允许 `docker build .` 在当前平台工作；CI 通过 `--build-arg BASE_IMAGE=...` 覆盖架构基础镜像。
-5. 主镜像名只作为本地 Build、Save 和 Release 中的镜像引用：不为主镜像名登录或推送，除非用户明确要求主仓库 Push。
-6. 阿里云 Push 是独立可选模块：只有地址、命名空间和账号密码齐全时执行 `docker tag` 与 `docker push`；缺少配置时跳过 Push，但不能阻断 Build 或使用主镜像生成 Release。
+5. 主镜像名只作为本地 Build、Save 和 Release 中的镜像引用：不为主镜像名登录或推送，除非用户明确要求主仓库 Push。镜像引用可以不带 Tag；不带 Tag 时由 Docker 按 `latest` 解析，脚本不得拼接 `:latest` 或其他 Tag。
+6. 阿里云 Push 是独立可选模块：只有地址、命名空间和账号密码齐全时执行 `docker tag` 与 `docker push`；目标地址按用户配置原样使用，不得从主镜像名或 Release tag 推导 Tag；缺少配置时跳过 Push，但不能阻断 Build 或使用主镜像生成 Release。
 7. Release 选择镜像来源：有阿里云 Push 时优先从阿里云镜像打包；没有阿里云配置时使用构建出的本地镜像 Artifact。Release-only 模式无法访问本地 Build 时，必须明确要求可拉取的阿里云镜像，或先执行 Build。
 8. HAP Webhook 必须使用 nginx-make 兼容的通用 JSON 协议：固定输出 `project_name`、`repository`、`version`、`tag`、`release_url`、`amd64_name`、`amd64_url`、`amd64_sha256`、`arm64_name`、`arm64_url`、`arm64_sha256`、`attachment_urls`、`commit_sha`、`run_id`、`run_url`、`build_status`；其中 `attachment_urls` 是 JSON 字符串，不是 JSON 数组。项目名从 `RELEASE_NAME` 或仓库名推导，不能把项目字段硬编码到 CI 引擎。
 9. HAP Webhook URL 为空或开关关闭时只跳过通知，并在 `$GITHUB_STEP_SUMMARY` 写出明确原因；不能因为 URL 为空而让 Release 失败。通知只在 Release 成功后发送。
 10. 每个独立 Job 都必须 checkout 仓库。Job 之间只共享 Artifact 和 Job Outputs，不共享工作区文件。
 11. 不要使用保留环境变量名作为业务配置名。尤其不要把构建目录命名为 `DOCKER_CONTEXT`；Docker 会将其解释为 Docker Context 名称。使用 `BUILD_CONTEXT`。
 12. buildx 必须可靠初始化。不要依赖空的 `BUILDX_BUILDER` 或某个 Action 的隐式 Builder；构建脚本应明确选择或创建 Builder，并在构建时传 `--builder`。
-13. Artifact 名称按镜像最后一段和 tag 生成，例如：
+13. Artifact 名称按镜像最后一段和 Release tag 生成；Release tag 入参可省略，未配置时使用 `latest`，例如：
 
    ```text
    hap-promtail-vlogs-mongodb-amd64:1.0.0
@@ -80,7 +80,7 @@ metadata:
 workflow_dispatch 输入
 > GitHub Repository Variables
 > .image-build.env
-> Workflow 默认值
+> Workflow 默认值（`IMAGE_TAG` 为 `latest`）
 ```
 
 建议配置项：
@@ -110,7 +110,7 @@ BUILD_CONTEXT
 
 GitHub 配置入口统一为 `Settings → Secrets and variables → Actions`：非敏感项放 `Variables`，账号密码、Webhook URL、AppKey 和 Sign 放 `Secrets`。HAP 至少需要 `HAP_WEBHOOK_URL` 和 `ENABLE_HAP_WEBHOOK=true`；`HAP_WEBHOOK_APP_KEY`、`HAP_WEBHOOK_SIGN` 按接收端要求配置。配置后必须通过 `Actions → Image Make → Run workflow` 手动验证，并检查 config/Release Summary 的启用、跳过原因和 HAP 请求结果。
 
-README 必须区分三类默认值：手动 `workflow_dispatch` 输入默认值、项目 `.image-build.env` 默认值，以及没有默认值的必填配置。通用 Workflow 不得伪造项目镜像名；镜像地址、namespace 等未配置时必须写明“无默认值”和实际跳过行为。
+README 必须区分三类默认值：手动 `workflow_dispatch` 输入默认值、项目 `.image-build.env` 默认值，以及没有默认值的必填配置。`tag` 入参可省略，未配置 `IMAGE_TAG` 时使用 `latest`。镜像地址可以不带 Tag，由 Docker 解析为 `latest`；Workflow 和脚本不得自行追加 Tag。通用 Workflow 不得伪造项目镜像名；镜像地址、namespace 等未配置时必须写明实际跳过行为。
 
 ## 通用性审计
 

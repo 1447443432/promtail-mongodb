@@ -40,19 +40,19 @@ docker push 阿里云镜像
 
 手动输入项的含义：
 
-- `tag`：可选的 GitHub Release tag；留空时使用 Repository Variable 或 `.image-build.env` 的 `IMAGE_TAG`。镜像地址按原样使用
+- `tag`：可选的 GitHub Release tag；留空时使用 Repository Variable 或 `.image-build.env` 的 `IMAGE_TAG`，都未配置时使用 `latest`。镜像地址按原样使用
 - `platforms`：参与构建的平台，默认 `linux/amd64,linux/arm64`
 - `build_image`：构建模块开关；关闭后 `build-release` 和 `build-push-release` 不会构建
 - `push_aliyun`：阿里云推送模块开关；关闭或配置不完整时只跳过推送
 - `create_release`：Release 模块开关；关闭后不会打包上传 Release
 - `notify_hap`：HAP Webhook 通知模块开关；关闭或 URL 为空时只跳过通知
-- `target_image_amd64`、`target_image_arm64`：覆盖两个架构的主镜像地址，按填写内容原样使用，不会自动追加 tag
+- `target_image_amd64`、`target_image_arm64`：覆盖两个架构的主镜像地址，按填写内容原样使用；地址未带 Tag 时由 Docker 按 `latest` 解析
 - `aliyun_namespace`：覆盖阿里云命名空间
-- `aliyun_image_amd64`、`aliyun_image_arm64`：覆盖阿里云目标镜像地址，按填写内容原样使用，不会自动追加 tag
+- `aliyun_image_amd64`、`aliyun_image_arm64`：覆盖阿里云目标镜像地址，按填写内容原样使用；地址未带 Tag 时由 Docker 按 `latest` 解析
 
 `pull-release` 需要提前存在可拉取的阿里云镜像和完整的阿里云凭据。如果只想构建而不创建 Release，可将 `create_release` 关闭；`build-release` 本身会创建 Release。
 
-手动运行时必须填写 `tag`；自动提交时必须在 `.image-build.env` 或 Repository Variable 中显式配置 `IMAGE_TAG`，否则不会构建或发布。
+手动运行时可以不填写 `tag`；自动提交和手动运行都遵循配置优先级，所有来源都没有 `IMAGE_TAG` 时使用 `latest`。
 
 ## 架构基础镜像
 
@@ -158,16 +158,16 @@ GitHub Actions 会根据矩阵自动传入 `TARGETARCH=amd64` 或 `TARGETARCH=ar
 | 输入 | 默认值 | 是否必填 | 说明 |
 |---|---|---|---|
 | `operation` | `build-release` | 是 | `build-release` 构建并 Release；`pull-release` 拉取并 Release；`build-push-release` 构建、推送并 Release |
-| `tag` | 空 | 否 | GitHub Release tag；留空时使用 Repository Variable 或 `.image-build.env` 的 `IMAGE_TAG` |
+| `tag` | 空 | 否 | GitHub Release tag；留空时使用 Repository Variable、`.image-build.env` 的 `IMAGE_TAG`，都没有时使用 `latest` |
 | `platforms` | `linux/amd64,linux/arm64` | 是 | 参与构建的平台 |
 | `build_image` | `true` | 是 | 是否启用构建模块 |
 | `push_aliyun` | `false` | 是 | 是否启用阿里云 Push；还必须满足阿里云配置完整 |
 | `create_release` | `true` | 是 | 是否创建 GitHub Release |
 | `notify_hap` | `false` | 是 | 是否启用 HAP 通知；还必须配置 Webhook URL |
-| `target_image_amd64` | 空 | 否 | 空时使用 `.image-build.env` 或 Repository Variable；地址按原样使用 |
+| `target_image_amd64` | 空 | 否 | 空时使用 `.image-build.env` 或 Repository Variable；地址按原样使用，未带 Tag 时 Docker 使用 `latest` |
 | `target_image_arm64` | 空 | 否 | 同上 |
 | `aliyun_namespace` | 空 | 否 | 空时使用 `.image-build.env` 或 Repository Variable；没有完整阿里云配置只跳过 Push |
-| `aliyun_image_amd64` | 空 | 否 | 可选；填写后按原样使用，不会自动追加 tag |
+| `aliyun_image_amd64` | 空 | 否 | 可选；填写后按原样使用，未带 Tag 时 Docker 使用 `latest` |
 | `aliyun_image_arm64` | 空 | 否 | 同上 |
 
 当前项目 `.image-build.env` 中的默认值如下：
@@ -218,7 +218,7 @@ Variables 用于在 GitHub 侧覆盖非敏感配置，不是全部必填。在 `
 
 | Name | 示例值/项目默认值 | 作用 |
 |---|---|---|
-| `IMAGE_TAG` | `1.0.0` | Push 事件使用的显式 Release tag；不配置则不构建/发布 |
+| `IMAGE_TAG` | `latest` | Release tag；不配置时使用 `latest` |
 | `RELEASE_NAME` | `promtail-mongodb` | Release 名和 HAP `project_name`；不配置时使用仓库名 |
 | `TARGET_IMAGE_AMD64` | `registry.example.com/project/image-amd64` | amd64 主镜像地址，按原样使用 |
 | `TARGET_IMAGE_ARM64` | `registry.example.com/project/image-arm64` | arm64 主镜像地址，按原样使用 |

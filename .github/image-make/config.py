@@ -30,8 +30,7 @@ def value(key, input_key=None, variable_key=None, default=""):
     return config.get(key, default).strip()
 
 
-tag = value("IMAGE_TAG", "INPUT_TAG", "VAR_IMAGE_TAG")
-tag_missing = not tag
+tag = value("IMAGE_TAG", "INPUT_TAG", "VAR_IMAGE_TAG", "latest")
 repository_name = os.environ.get("GITHUB_REPOSITORY", "image").rsplit("/", 1)[-1]
 release_name = value("RELEASE_NAME", None, "VAR_RELEASE_NAME", repository_name)
 base_amd64 = value("BASE_IMAGE_AMD64", None, "VAR_BASE_IMAGE_AMD64")
@@ -72,7 +71,7 @@ aliyun_missing = [
     ) if not item]
 aliyun = aliyun_enabled and not aliyun_missing and primary
 base = bool(base_amd64 and base_arm64)
-can_build = build_enabled and primary and base and not tag_missing
+can_build = build_enabled and primary and base
 operation = os.environ.get("OPERATION", "build-release")
 can_package = release_enabled and operation in ("build-release", "build-push-release", "pull-release") and (aliyun if operation == "pull-release" else can_build)
 can_release = can_package
@@ -84,8 +83,6 @@ elif not aliyun:
     reasons.append("Aliyun push skipped; missing: " + ", ".join(aliyun_missing))
 if not primary:
     reasons.append("Build skipped; missing primary image names: " + ", ".join(primary_missing))
-if tag_missing:
-    reasons.append("Build and Release skipped; IMAGE_TAG or workflow tag must be provided explicitly.")
 if build_enabled and not base:
     reasons.append("Build skipped; BASE_IMAGE_AMD64 or BASE_IMAGE_ARM64 is missing.")
 if release_enabled and can_release:
