@@ -41,9 +41,7 @@ docker push 阿里云镜像
 手动输入项的含义：
 
 - `tag`：可选的 GitHub Release tag；手动运行时留空直接使用 `latest`，不会自动追加到镜像地址
-- `platforms`：参与构建的平台，默认 `linux/amd64,linux/arm64`
-- `build_image`：构建模块开关；关闭后 `build-release` 和 `build-push-release` 不会构建
-- `push_aliyun`：阿里云推送模块开关；关闭或配置不完整时只跳过推送
+- `architectures`：选择 `amd64`、`arm64` 或 `all`；默认 `all`
 - `create_release`：Release 模块开关；关闭后不会打包上传 Release
 - `notify_hap`：HAP Webhook 通知模块开关；关闭或 URL 为空时只跳过通知
 - `target_image_amd64`、`target_image_arm64`：覆盖两个架构的主镜像地址；留空时使用配置中的主镜像地址，地址未带 Tag 时由 Docker 按 `latest` 解析
@@ -157,9 +155,7 @@ GitHub Actions 会根据矩阵自动传入 `TARGETARCH=amd64` 或 `TARGETARCH=ar
 |---|---|---|---|
 | `operation` | `build-release` | 是 | `build-release` 构建并 Release；`pull-release` 拉取并 Release；`build-push-release` 构建、推送并 Release |
 | `tag` | 空 | 否 | GitHub Release tag；手动运行时留空直接使用 `latest` |
-| `platforms` | `linux/amd64,linux/arm64` | 是 | 参与构建的平台 |
-| `build_image` | `true` | 是 | 是否启用构建模块 |
-| `push_aliyun` | `false` | 是 | 是否启用阿里云 Push；还必须满足阿里云配置完整 |
+| `architectures` | `all` | 是 | 构建 `amd64`、`arm64` 或两个架构 |
 | `create_release` | `true` | 是 | 是否创建 GitHub Release |
 | `notify_hap` | `false` | 是 | 是否启用 HAP 通知；还必须配置 Webhook URL |
 | `target_image_amd64` | 空 | 否 | 空时使用 `.image-build.env` 或 Repository Variable；地址按原样使用，未带 Tag 时 Docker 使用 `latest` |
@@ -171,13 +167,13 @@ GitHub Actions 会根据矩阵自动传入 `TARGETARCH=amd64` 或 `TARGETARCH=ar
 
 ```text
 IMAGE_TAG=1.0.0
+ARCHITECTURES=all
 RELEASE_NAME=hap-promtail-vlogs-mongodb
 BASE_IMAGE_AMD64=alpine:3.23
 BASE_IMAGE_ARM64=alpine:3.23
 TARGET_IMAGE_AMD64=registry.cn-hangzhou.aliyuncs.com/hap-mdy/hap-promtail-vlogs-mongodb-amd64:1.0.0
 TARGET_IMAGE_ARM64=registry.cn-hangzhou.aliyuncs.com/hap-mdy/hap-promtail-vlogs-mongodb-arm64:1.0.0
 ALIYUN_REGISTRY=registry.cn-hangzhou.aliyuncs.com
-ENABLE_BUILD=true
 ENABLE_ALIYUN_PUSH=true
 ENABLE_RELEASE=true
 ENABLE_HAP_WEBHOOK=true
@@ -223,7 +219,6 @@ Variables 用于在 GitHub 侧覆盖非敏感配置，不是全部必填。在 `
 | `ALIYUN_REGISTRY` | `registry.cn-hangzhou.aliyuncs.com` | 阿里云 Registry 地址 |
 | `ALIYUN_IMAGE_AMD64` | `registry.example.com/project/image-amd64` | 阿里云 amd64 镜像地址，按原样使用 |
 | `ALIYUN_IMAGE_ARM64` | `registry.example.com/project/image-arm64` | 阿里云 arm64 镜像地址，按原样使用 |
-| `ENABLE_BUILD` | `true` | 构建模块开关 |
 | `ENABLE_ALIYUN_PUSH` | `true` | 阿里云 Push 模块开关 |
 | `ENABLE_RELEASE` | `true` | GitHub Release 模块开关 |
 | `ENABLE_HAP_WEBHOOK` | `true` | HAP Webhook 模块开关 |

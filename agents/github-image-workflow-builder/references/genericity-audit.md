@@ -32,7 +32,7 @@ rg -n "当前仓库名|当前镜像名|当前 namespace|客户名" \
 推荐默认值：
 
 - 手动 `tag` 入参留空时直接使用 `latest`；push 事件的 `IMAGE_TAG` 可由 `.image-build.env` 或 Repository Variable 显式覆盖，未配置时使用 `latest`
-- `PLATFORMS` 可以使用 `linux/amd64,linux/arm64`
+- 架构选择可以使用 `amd64`、`arm64` 或 `all`，默认 `all`
 - `BASE_IMAGE_AMD64`、`BASE_IMAGE_ARM64` 没有可靠通用值时留空并跳过 Build
 - 主镜像地址没有通用值时留空并跳过 Build/Release；镜像地址若未带 Tag，由 Docker 使用 `latest`，不得由脚本拼接
 - 阿里云目标地址留空时复用对应主镜像完整引用，不能把空值改成固定的 `latest`

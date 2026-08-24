@@ -18,16 +18,12 @@ on:
         required: false
         default: ''
         type: string
-      platforms:
-        description: "构建平台；通常保持默认值"
+      architectures:
+        description: "选择架构：amd64、arm64 或 all（两个架构）"
         required: true
-        default: linux/amd64,linux/arm64
-        type: string
-      build_image:
-        description: "是否构建镜像；关闭后只执行后续可用步骤"
-        required: true
-        default: true
-        type: boolean
+        default: all
+        type: choice
+        options: [amd64, arm64, all]
       target_image_amd64:
         description: "amd64 主镜像地址；留空使用项目配置，未填 Tag 时使用 latest"
         required: false
@@ -38,11 +34,6 @@ on:
         required: false
         default: ''
         type: string
-      push_aliyun:
-        description: "是否推送到阿里云；开启后需配置 Registry 和账号密码"
-        required: true
-        default: false
-        type: boolean
       aliyun_image_amd64:
         description: "阿里云 amd64 镜像地址；留空复用主 amd64 地址"
         required: false
@@ -66,7 +57,7 @@ on:
 
 env:
   WORKFLOW_OPERATION: ${{ github.event_name == 'push' && 'build-push-release' || inputs.operation }}
-  WORKFLOW_PLATFORMS: ${{ github.event_name == 'push' && 'linux/amd64,linux/arm64' || inputs.platforms }}
+  WORKFLOW_ARCHITECTURES: ${{ github.event_name == 'push' && 'all' || inputs.architectures }}
   REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME || secrets.ALIYUN_REGISTRY_USERNAME }}
   REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD || secrets.ALIYUN_REGISTRY_PASSWORD }}
   HAP_WEBHOOK_URL: ${{ secrets.HAP_WEBHOOK_URL }}
@@ -85,14 +76,14 @@ jobs:
     outputs:
       tag: ${{ steps.check.outputs.tag }}
       release_name: ${{ steps.check.outputs.release_name }}
-      platforms: ${{ steps.check.outputs.platforms }}
+      architectures: ${{ steps.check.outputs.architectures }}
       target_image_amd64: ${{ steps.check.outputs.target_image_amd64 }}
       target_image_arm64: ${{ steps.check.outputs.target_image_arm64 }}
       aliyun_image_amd64: ${{ steps.check.outputs.aliyun_image_amd64 }}
       aliyun_image_arm64: ${{ steps.check.outputs.aliyun_image_arm64 }}
       aliyun_registry: ${{ steps.check.outputs.aliyun_registry }}
-      build_enabled: ${{ steps.check.outputs.build_enabled }}
       aliyun_push_enabled: ${{ steps.check.outputs.aliyun_push_enabled }}
+      aliyun_pull_enabled: ${{ steps.check.outputs.aliyun_pull_enabled }}
       release_enabled: ${{ steps.check.outputs.release_enabled }}
       hap_enabled: ${{ steps.check.outputs.hap_enabled }}
       dockerfile: ${{ steps.check.outputs.dockerfile }}
@@ -117,8 +108,6 @@ jobs:
           INPUT_TARGET_IMAGE_ARM64: ${{ inputs.target_image_arm64 }}
           INPUT_ALIYUN_IMAGE_AMD64: ${{ inputs.aliyun_image_amd64 }}
           INPUT_ALIYUN_IMAGE_ARM64: ${{ inputs.aliyun_image_arm64 }}
-          INPUT_BUILD_IMAGE: ${{ inputs.build_image }}
-          INPUT_PUSH_ALIYUN: ${{ inputs.push_aliyun }}
           INPUT_CREATE_RELEASE: ${{ inputs.create_release }}
           INPUT_NOTIFY_HAP: ${{ inputs.notify_hap }}
           VAR_IMAGE_TAG: ${{ vars.IMAGE_TAG }}
@@ -130,7 +119,6 @@ jobs:
           VAR_ALIYUN_REGISTRY: ${{ vars.ALIYUN_REGISTRY }}
           VAR_ALIYUN_IMAGE_AMD64: ${{ vars.ALIYUN_IMAGE_AMD64 }}
           VAR_ALIYUN_IMAGE_ARM64: ${{ vars.ALIYUN_IMAGE_ARM64 }}
-          VAR_ENABLE_BUILD: ${{ vars.ENABLE_BUILD }}
           VAR_ENABLE_ALIYUN_PUSH: ${{ vars.ENABLE_ALIYUN_PUSH }}
           VAR_ENABLE_RELEASE: ${{ vars.ENABLE_RELEASE }}
           VAR_ENABLE_HAP_WEBHOOK: ${{ vars.ENABLE_HAP_WEBHOOK }}
@@ -138,7 +126,7 @@ jobs:
           ALIYUN_PASSWORD: ${{ env.ALIYUN_REGISTRY_PASSWORD || env.REGISTRY_PASSWORD }}
           ALIYUN_REGISTRY: ${{ env.ALIYUN_REGISTRY }}
           OPERATION: ${{ env.WORKFLOW_OPERATION }}
-          WORKFLOW_PLATFORMS: ${{ env.WORKFLOW_PLATFORMS }}
+          WORKFLOW_ARCHITECTURES: ${{ env.WORKFLOW_ARCHITECTURES }}
           HAP_WEBHOOK_URL: ${{ env.HAP_WEBHOOK_URL }}
         run: python3 .github/image-make/config.py
 
@@ -148,14 +136,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - architecture: amd64
-            platform: linux/amd64
-            runner: ubuntu-24.04
-          - architecture: arm64
-            platform: linux/arm64
-            runner: ubuntu-24.04-arm
-    runs-on: ${{ matrix.runner }}
+        architecture: ${{ fromJSON(needs.config.outputs.architectures) }}
+    runs-on: ${{ matrix.architecture == 'amd64' && 'ubuntu-24.04' || 'ubuntu-24.04-arm' }}
     permissions:
       contents: read
     steps:
@@ -163,8 +145,8 @@ jobs:
       - name: Build architecture image
         env:
           ARCHITECTURE: ${{ matrix.architecture }}
-          PLATFORM: ${{ matrix.platform }}
-          RUNNER: ${{ matrix.runner }}
+          PLATFORM: ${{ matrix.architecture == 'amd64' && 'linux/amd64' || 'linux/arm64' }}
+          RUNNER: ${{ matrix.architecture == 'amd64' && 'ubuntu-24.04' || 'ubuntu-24.04-arm' }}
           TARGET_IMAGE: ${{ matrix.architecture == 'amd64' && needs.config.outputs.target_image_amd64 || needs.config.outputs.target_image_arm64 }}
           ALIYUN_IMAGE_OVERRIDE: ${{ matrix.architecture == 'amd64' && needs.config.outputs.aliyun_image_amd64 || needs.config.outputs.aliyun_image_arm64 }}
           ALIYUN_REGISTRY: ${{ needs.config.outputs.aliyun_registry }}
@@ -196,14 +178,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - architecture: amd64
-            platform: linux/amd64
-            runner: ubuntu-24.04
-          - architecture: arm64
-            platform: linux/arm64
-            runner: ubuntu-24.04-arm
-    runs-on: ${{ matrix.runner }}
+        architecture: ${{ fromJSON(needs.config.outputs.architectures) }}
+    runs-on: ${{ matrix.architecture == 'amd64' && 'ubuntu-24.04' || 'ubuntu-24.04-arm' }}
     permissions:
       contents: read
     steps:
@@ -256,7 +232,6 @@ jobs:
           ALIYUN_IMAGE_AMD64: ${{ needs.config.outputs.aliyun_image_amd64 }}
           ALIYUN_IMAGE_ARM64: ${{ needs.config.outputs.aliyun_image_arm64 }}
           ALIYUN_REGISTRY: ${{ needs.config.outputs.aliyun_registry }}
-          PLATFORMS: ${{ needs.config.outputs.platforms }}
           PUSH_ALIYUN: ${{ needs.config.outputs.can_aliyun }}
           HAP_ENABLED: ${{ needs.config.outputs.hap_enabled }}
           HAP_WEBHOOK_URL: ${{ env.HAP_WEBHOOK_URL }}

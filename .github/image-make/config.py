@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Resolve image workflow configuration and write GitHub outputs/summary."""
 
+import json
 import os
 
 
@@ -49,44 +50,58 @@ dockerfile = config.get("DOCKERFILE", "Dockerfile").strip()
 build_context = config.get("BUILD_CONTEXT", ".").strip()
 alpine_mirror = config.get("ALPINE_MIRROR", "https://mirrors.aliyun.com/alpine").strip()
 alpine_version = config.get("ALPINE_VERSION", "3.23").strip()
-platforms = (os.environ.get("WORKFLOW_PLATFORMS", "").strip() or config.get("PLATFORMS", "linux/amd64,linux/arm64").strip())
-build_enabled = value("ENABLE_BUILD", "INPUT_BUILD_IMAGE", "VAR_ENABLE_BUILD", "true").lower() == "true"
-aliyun_enabled = value("ENABLE_ALIYUN_PUSH", "INPUT_PUSH_ALIYUN", "VAR_ENABLE_ALIYUN_PUSH", "true").lower() == "true"
+architecture_selection = os.environ.get("WORKFLOW_ARCHITECTURES", "").strip() or config.get("ARCHITECTURES", "all").strip()
+architectures = {
+    "amd64": ["amd64"],
+    "arm64": ["arm64"],
+    "all": ["amd64", "arm64"],
+}.get(architecture_selection, [])
+aliyun_enabled = value("ENABLE_ALIYUN_PUSH", None, "VAR_ENABLE_ALIYUN_PUSH", "true").lower() == "true"
 release_enabled = value("ENABLE_RELEASE", "INPUT_CREATE_RELEASE", "VAR_ENABLE_RELEASE", "true").lower() == "true"
 hap_enabled = value("ENABLE_HAP_WEBHOOK", "INPUT_NOTIFY_HAP", "VAR_ENABLE_HAP_WEBHOOK", "true").lower() == "true"
 
+selected = set(architectures)
 primary_missing = [
-    name for name, item in (
-        ("TARGET_IMAGE_AMD64", target_amd64),
-        ("TARGET_IMAGE_ARM64", target_arm64),
-    ) if not item
+    name for architecture, name, item in (
+        ("amd64", "TARGET_IMAGE_AMD64", target_amd64),
+        ("arm64", "TARGET_IMAGE_ARM64", target_arm64),
+    ) if architecture in selected and not item
 ]
-primary = not primary_missing
+primary = bool(architectures) and not primary_missing
 aliyun_user = os.environ.get("ALIYUN_USERNAME", "").strip()
 aliyun_password = os.environ.get("ALIYUN_PASSWORD", "").strip()
-aliyun_missing = [
-    name for name, item in (
-        ("ALIYUN_REGISTRY", aliyun_registry),
-        ("ALIYUN_USERNAME", aliyun_user),
-        ("ALIYUN_PASSWORD", aliyun_password),
-        ("ALIYUN_IMAGE_AMD64", aliyun_amd64),
-        ("ALIYUN_IMAGE_ARM64", aliyun_arm64),
-    ) if not item]
-aliyun = aliyun_enabled and not aliyun_missing and primary
-base = bool(base_amd64 and base_arm64)
-can_build = build_enabled and primary and base
+aliyun_missing = [name for name, item in (
+    ("ALIYUN_REGISTRY", aliyun_registry),
+    ("ALIYUN_USERNAME", aliyun_user),
+    ("ALIYUN_PASSWORD", aliyun_password),
+) if not item]
+aliyun_missing.extend(
+    name for architecture, name, item in (
+        ("amd64", "ALIYUN_IMAGE_AMD64", aliyun_amd64),
+        ("arm64", "ALIYUN_IMAGE_ARM64", aliyun_arm64),
+    ) if architecture in selected and not item
+)
+aliyun_configured = not aliyun_missing and primary
+base = all(item for architecture, item in (("amd64", base_amd64), ("arm64", base_arm64)) if architecture in selected)
+can_build = primary and base and bool(architectures)
 operation = os.environ.get("OPERATION", "build-release")
-can_package = release_enabled and operation in ("build-release", "build-push-release", "pull-release") and (aliyun if operation == "pull-release" else can_build)
+can_push_aliyun = operation == "build-push-release" and aliyun_enabled and aliyun_configured
+can_pull_aliyun = operation == "pull-release" and aliyun_configured
+can_package = release_enabled and operation in ("build-release", "build-push-release", "pull-release") and (can_pull_aliyun if operation == "pull-release" else can_build)
 can_release = can_package
 
 reasons = []
-if not aliyun_enabled:
+if operation == "pull-release" and not can_pull_aliyun:
+    reasons.append("Aliyun pull skipped; missing: " + ", ".join(aliyun_missing))
+elif operation == "build-push-release" and not aliyun_enabled:
     reasons.append("Aliyun push skipped; module is disabled.")
-elif not aliyun:
+elif operation == "build-push-release" and not can_push_aliyun:
     reasons.append("Aliyun push skipped; missing: " + ", ".join(aliyun_missing))
 if not primary:
     reasons.append("Build skipped; missing primary image names: " + ", ".join(primary_missing))
-if build_enabled and not base:
+if not architectures:
+    reasons.append("Build skipped; architectures must be amd64, arm64 or all.")
+if not base:
     reasons.append("Build skipped; BASE_IMAGE_AMD64 or BASE_IMAGE_ARM64 is missing.")
 if release_enabled and can_release:
     reasons.append("GitHub Release: enabled.")
@@ -105,9 +120,11 @@ with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
     summary.write(f"- **Operation:** `{operation}`\n- **Release name:** `{release_name}`\n- **Release tag:** `{tag}`\n")
     summary.write(f"- **Dockerfile:** `{dockerfile}`\n- **Build context:** `{build_context}`\n\n")
     summary.write("| Module | Status | Details |\n|---|---|---|\n")
-    summary.write(f"| Build | **{status(can_build)}** | enabled: `{str(build_enabled).lower()}`, bases: `{base_amd64 or 'missing'}` / `{base_arm64 or 'missing'}` |\n")
+    summary.write(f"| Build | **{status(can_build)}** | architectures: `{', '.join(architectures) or 'invalid'}`, bases: `{base_amd64 or 'missing'}` / `{base_arm64 or 'missing'}` |\n")
     summary.write(f"| Primary image names | **{status(primary, ', '.join(primary_missing))}** | `{target_amd64 or 'missing'}` / `{target_arm64 or 'missing'}` |\n")
-    aliyun_status = "disabled" if not aliyun_enabled else status(aliyun, ", ".join(aliyun_missing))
+    aliyun_status = "ready" if can_push_aliyun or can_pull_aliyun else "not selected"
+    if operation in ("build-push-release", "pull-release") and not (can_push_aliyun or can_pull_aliyun):
+        aliyun_status = status(False, ", ".join(aliyun_missing))
     summary.write(f"| Aliyun push | **{aliyun_status}** | `{aliyun_registry}` |\n")
     summary.write(f"| GitHub Release | **{status(can_release)}** | enabled: `{str(release_enabled).lower()}` |\n")
     summary.write(f"| HAP Webhook | **{'ready' if hap_enabled and os.environ.get('HAP_WEBHOOK_URL', '').strip() else 'skipped'}** | enabled: `{str(hap_enabled).lower()}` |\n\n")
@@ -115,16 +132,16 @@ with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
     summary.write("\n".join(f"- {item}" for item in reasons) + "\n")
 
 outputs = {
-    "tag": tag, "release_name": release_name, "platforms": platforms,
+    "tag": tag, "release_name": release_name, "architectures": json.dumps(architectures),
     "base_image_amd64": base_amd64, "base_image_arm64": base_arm64,
     "target_image_amd64": target_amd64, "target_image_arm64": target_arm64,
     "aliyun_image_amd64": aliyun_amd64, "aliyun_image_arm64": aliyun_arm64,
     "aliyun_registry": aliyun_registry,
-    "build_enabled": str(build_enabled).lower(), "aliyun_push_enabled": str(aliyun_enabled).lower(),
+    "aliyun_push_enabled": str(can_push_aliyun).lower(), "aliyun_pull_enabled": str(can_pull_aliyun).lower(),
     "release_enabled": str(release_enabled).lower(), "hap_enabled": str(hap_enabled).lower(),
     "dockerfile": dockerfile, "build_context": build_context,
     "alpine_mirror": alpine_mirror, "alpine_version": alpine_version,
-    "can_primary": str(primary).lower(), "can_aliyun": str(aliyun).lower(),
+    "can_primary": str(primary).lower(), "can_aliyun": str(can_push_aliyun).lower(),
     "can_build": str(can_build).lower(), "can_package": str(can_package).lower(),
     "can_release": str(can_release).lower(),
 }
@@ -135,6 +152,6 @@ with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
 print("========== configuration result ==========")
 print("[OK] configuration resolved")
 print(f"tag={tag}")
-print(f"build={'enabled' if build_enabled else 'disabled'}")
-print(f"aliyun_push={'ready' if aliyun else 'skipped'}")
+print(f"build={'ready' if can_build else 'skipped'}")
+print(f"aliyun_push={'ready' if can_push_aliyun else 'skipped'}")
 print(f"release={'ready' if can_release else 'skipped'}")

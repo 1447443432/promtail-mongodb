@@ -80,13 +80,14 @@ metadata:
 workflow_dispatch 输入
 > GitHub Repository Variables
 > .image-build.env
-> Workflow 默认值（`IMAGE_TAG` 为 `latest`）
+> Workflow 默认值（`IMAGE_TAG` 为 `latest`，架构选择为 `all`）
 ```
 
 建议配置项：
 
 ```text
 IMAGE_TAG
+ARCHITECTURES
 RELEASE_NAME
 BASE_IMAGE_AMD64
 BASE_IMAGE_ARM64
@@ -97,7 +98,6 @@ ALIYUN_IMAGE_AMD64
 ALIYUN_IMAGE_ARM64
 ALPINE_MIRROR
 ALPINE_VERSION
-ENABLE_BUILD
 ENABLE_ALIYUN_PUSH
 ENABLE_RELEASE
 ENABLE_HAP_WEBHOOK
