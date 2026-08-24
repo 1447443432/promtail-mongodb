@@ -32,7 +32,7 @@ docker push 阿里云镜像
 
 使用 `Actions → Image Make → Run workflow` 时，`operation` 请选择以下模式之一：
 
-- `build-only`：只构建 amd64/arm64 镜像，并上传构建产物；不创建 GitHub Release。
+- `build-only`：构建 amd64/arm64 镜像、生成压缩包和 SHA256，并创建 GitHub Release；默认不推送阿里云。
 - `build-and-release`：构建镜像、按配置推送阿里云、打包并创建 GitHub Release。
 - `release-only`：不重新构建，从已配置的阿里云镜像拉取对应架构镜像，打包并创建 GitHub Release。
 
@@ -50,7 +50,7 @@ docker push 阿里云镜像
 - `aliyun_namespace`：覆盖阿里云命名空间
 - `aliyun_image_amd64`、`aliyun_image_arm64`：覆盖阿里云目标镜像名，不含 tag
 
-`release-only` 需要提前存在可拉取的阿里云镜像和完整的阿里云凭据；如果只想验证构建，请选择 `build-only`。
+`release-only` 需要提前存在可拉取的阿里云镜像和完整的阿里云凭据。如果只想构建而不创建 Release，可将 `create_release` 关闭；`build-only` 本身会创建 Release。
 
 tag 默认是 `1.0.0`。手动运行时可修改 Workflow 输入；自动提交时可配置 Repository Variable `IMAGE_TAG`。
 
@@ -157,7 +157,7 @@ GitHub Actions 会根据矩阵自动传入 `TARGETARCH=amd64` 或 `TARGETARCH=ar
 
 | 输入 | 默认值 | 是否必填 | 说明 |
 |---|---|---|---|
-| `operation` | `build-and-release` | 是 | `build-only`、`build-and-release` 或 `release-only` |
+| `operation` | `build-and-release` | 是 | `build-only` 构建并 Release；`build-and-release` 构建、推送并 Release；`release-only` 拉取并 Release |
 | `tag` | `1.0.0` | 是 | 镜像 tag 和 Release tag |
 | `platforms` | `linux/amd64,linux/arm64` | 是 | 参与构建的平台 |
 | `build_image` | `true` | 是 | 是否启用构建模块 |
@@ -299,7 +299,7 @@ Repository Secrets:
 
 建议按以下顺序验证：
 
-1. 先用 `build-only` 验证两个架构可以成功构建。
+1. 先用 `build-only` 验证两个架构构建、打包和 Release。
 2. 配置阿里云后用 `build-and-release` 验证 Tag、Push 和 Release 附件。
 3. 配置 HAP 后再次运行 `build-and-release`，检查 Release Job 的 `HAP sync` 和通知步骤。
 4. 检查 HAP 接收到的 `repository`、`version`、两个架构下载地址和 SHA256 是否正确。

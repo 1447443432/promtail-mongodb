@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       operation:
-        description: "运行模式：build-only=只构建；release-only=使用已有阿里云镜像打包并创建 Release；build-and-release=构建、推送、打包并创建 Release"
+        description: "运行模式：build-only=构建、打包并创建 Release；release-only=使用已有阿里云镜像打包并创建 Release；build-and-release=构建、推送、打包并创建 Release"
         required: true
         default: build-and-release
         type: choice
@@ -201,7 +201,7 @@ jobs:
 
   package:
     needs: [config, build]
-    if: ${{ always() && needs.config.outputs.can_package == 'true' && ((github.event_name == 'push' && needs.build.result == 'success') || (github.event_name != 'push' && ((inputs.operation == 'build-and-release' && needs.build.result == 'success') || (inputs.operation == 'release-only' && needs.build.result == 'skipped')))) }}
+    if: ${{ always() && needs.config.outputs.can_package == 'true' && ((github.event_name == 'push' && needs.build.result == 'success') || (github.event_name != 'push' && (((inputs.operation == 'build-only' || inputs.operation == 'build-and-release') && needs.build.result == 'success') || (inputs.operation == 'release-only' && needs.build.result == 'skipped')))) }}
     strategy:
       fail-fast: false
       matrix:
@@ -218,7 +218,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - name: Download packages from build jobs
-        if: ${{ github.event_name == 'push' || inputs.operation == 'build-and-release' }}
+        if: ${{ github.event_name == 'push' || inputs.operation == 'build-only' || inputs.operation == 'build-and-release' }}
         uses: actions/download-artifact@v8
         with:
           name: release-${{ matrix.architecture }}
@@ -246,7 +246,7 @@ jobs:
 
   release:
     needs: [config, build, package]
-    if: ${{ always() && needs.config.outputs.can_release == 'true' && ((github.event_name == 'push' && needs.build.result == 'success' && needs.package.result == 'success') || (github.event_name != 'push' && ((inputs.operation == 'build-and-release' && needs.build.result == 'success' && needs.package.result == 'success') || (inputs.operation == 'release-only' && needs.package.result == 'success')))) }}
+    if: ${{ always() && needs.config.outputs.can_release == 'true' && ((github.event_name == 'push' && needs.build.result == 'success' && needs.package.result == 'success') || (github.event_name != 'push' && (((inputs.operation == 'build-only' || inputs.operation == 'build-and-release') && needs.build.result == 'success' && needs.package.result == 'success') || (inputs.operation == 'release-only' && needs.package.result == 'success')))) }}
     runs-on: ubuntu-24.04
     permissions:
       contents: write

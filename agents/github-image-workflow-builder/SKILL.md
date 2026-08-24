@@ -13,6 +13,8 @@ metadata:
 
 该 Skill 面向“项目内自包含”的 Workflow：不要默认引入外部共享 Workflow、Reusable Workflow 或公共配置仓库。CI 辅助脚本应放在项目的 `.github/image-make/`，不要污染已有的业务 `scripts/` 目录。
 
+三种运行模式必须保持语义一致：`build-only` 构建并打包创建 Release（默认不推送阿里云），`build-and-release` 构建、按配置推送阿里云并创建 Release，`release-only` 不构建而从已有阿里云镜像拉取后创建 Release。
+
 ## 何时使用
 
 用户要求以下任一项时使用：

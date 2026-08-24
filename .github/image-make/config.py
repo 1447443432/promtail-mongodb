@@ -58,7 +58,7 @@ aliyun = aliyun_enabled and bool(aliyun_registry and aliyun_namespace and aliyun
 base = bool(base_amd64 and base_arm64)
 can_build = build_enabled and primary and base
 operation = os.environ.get("OPERATION", "build-and-release")
-can_package = release_enabled and operation in ("build-and-release", "release-only") and (aliyun if operation == "release-only" else can_build)
+can_package = release_enabled and operation in ("build-only", "build-and-release", "release-only") and (aliyun if operation == "release-only" else can_build)
 can_release = can_package
 
 primary_missing = [name for name, item in (("TARGET_IMAGE_AMD64", target_amd64), ("TARGET_IMAGE_ARM64", target_arm64)) if not item]
