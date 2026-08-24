@@ -49,3 +49,7 @@ Aliyun Push 必须独立判断。缺少 Registry、namespace、用户名或密�
 ## HAP Webhook 为空
 
 Webhook URL 为空或开关关闭时，通知步骤应为 skipped 或不执行，并在 Release Summary 写出原因。不要使用空 URL 调用 `curl`，也不要让 Release 因通知模块未配置而失败。
+
+## HAP 字段和 nginx-make 不一致
+
+Webhook 请求体应使用统一的扁平字段：`project_name`、`repository`、`version`、`tag`、`release_url`、两种架构的 `*_name`/`*_url`/`*_sha256`、`attachment_urls`、`commit_sha`、`run_id`、`run_url`、`build_status`。`attachment_urls` 必须是 JSON 字符串，例如 `"[\"https://.../amd64.tar.gz\",\"https://.../arm64.tar.gz\"]"`，不能直接传数组。所有 URL 和 SHA256 都必须从实际 GitHub Release 产物生成，不能写示例地址。

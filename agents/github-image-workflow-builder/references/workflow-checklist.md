@@ -16,6 +16,9 @@
 - [ ] 主镜像名不要求认证
 - [ ] Aliyun Registry、namespace、账号密码缺失时只跳过 Push
 - [ ] HAP URL 缺失时只跳过通知
+- [ ] HAP payload 使用 nginx-make 兼容固定字段
+- [ ] `attachment_urls` 是 JSON 字符串，且只包含实际 Release 附件 URL
+- [ ] HAP 的架构文件名、下载地址和 SHA256 来自实际产物
 - [ ] 账号、密码、签名未写入仓库
 - [ ] 没有使用 `DOCKER_CONTEXT` 作为构建目录变量
 - [ ] Alpine 源和版本通过 `ALPINE_MIRROR`、`ALPINE_VERSION` 配置

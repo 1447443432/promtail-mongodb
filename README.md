@@ -91,7 +91,32 @@ HAP 配置：
 
 HAP URL 为空时跳过通知，并在 Actions Summary 中说明原因。
 
-HAP Webhook 的请求体与 nginx-make 保持一致，包含 `project_name`、`repository`、`version`、`tag`、`release_url`、amd64/arm64 的附件名称、下载地址和 SHA256，以及 `attachment_urls`、`commit_sha`、`run_id`、`run_url`、`build_status`。其中 `attachment_urls` 按 HAP 约定以 JSON 字符串传递多个下载地址。请求仍使用 `Content-Type: application/json`，并按配置附带 `AppKey`、`Sign` 请求头。
+HAP Webhook 的请求体与 nginx-make 保持一致，使用固定的通用字段，不携带项目专用字段。`project_name` 使用 `RELEASE_NAME`（未配置时使用仓库名），版本和附件信息从当前 Release 自动生成。`attachment_urls` 按 HAP 约定以 JSON 字符串传递多个下载地址。请求使用 `Content-Type: application/json`，并按配置附带 `AppKey`、`Sign` 请求头。
+
+请求体示例：
+
+```json
+{
+  "project_name": "promtail-mongodb",
+  "repository": "1447443432/promtail-mongodb",
+  "version": "1.0.0",
+  "tag": "1.0.0",
+  "release_url": "https://github.com/1447443432/promtail-mongodb/releases/tag/1.0.0",
+  "amd64_name": "hap-promtail-vlogs-mongodb-amd64_1.0.0.tar.gz",
+  "amd64_url": "https://github.com/1447443432/promtail-mongodb/releases/download/1.0.0/hap-promtail-vlogs-mongodb-amd64_1.0.0.tar.gz",
+  "amd64_sha256": "...",
+  "arm64_name": "hap-promtail-vlogs-mongodb-arm64_1.0.0.tar.gz",
+  "arm64_url": "https://github.com/1447443432/promtail-mongodb/releases/download/1.0.0/hap-promtail-vlogs-mongodb-arm64_1.0.0.tar.gz",
+  "arm64_sha256": "...",
+  "attachment_urls": "[\"https://.../amd64.tar.gz\",\"https://.../arm64.tar.gz\"]",
+  "commit_sha": "e7daeca",
+  "run_id": "123456789",
+  "run_url": "https://github.com/1447443432/promtail-mongodb/actions/runs/123456789",
+  "build_status": "success"
+}
+```
+
+amd64 和 arm64 附件字段始终存在；如果某架构没有产物，对应值为空字符串。Webhook 只在 Release 成功后发送，URL 为空或模块关闭时跳过并在 Summary 中说明原因。
 
 ## 手动 Docker 构建
 
