@@ -212,11 +212,11 @@ Actions → Image Make → Run workflow
 
 手动执行一次验证。不要把密码、Webhook URL、AppKey 或 Sign 写入 README、`.image-build.env` 或 Workflow 文件。
 
-### Repository Variables
+### Repository Variables（可选覆盖项）
 
-Variables 用于非敏感配置。在 `Settings → Secrets and variables → Actions → Variables → New repository variable` 中添加：
+Variables 用于在 GitHub 侧覆盖非敏感配置，不是全部必填。在 `Settings → Secrets and variables → Actions → Variables → New repository variable` 中按需添加。当前项目已经有 `.image-build.env`，因此不需要把下面的值重复配置一遍；只有需要 GitHub 侧覆盖，或项目不提交 `.image-build.env` 时才配置 Variables。
 
-| Name | 示例值 | 作用 |
+| Name | 示例值/项目默认值 | 作用 |
 |---|---|---|
 | `IMAGE_TAG` | `1.0.0` | 默认镜像和 Release tag |
 | `RELEASE_NAME` | `promtail-mongodb` | Release 名和 HAP `project_name`；不配置时使用仓库名 |
