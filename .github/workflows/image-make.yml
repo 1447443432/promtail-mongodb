@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       operation:
-        description: Mode: build-only, release-only, or build-and-release
+        description: "Mode: build-only, release-only, or build-and-release"
         required: true
         default: build-and-release
         type: choice
