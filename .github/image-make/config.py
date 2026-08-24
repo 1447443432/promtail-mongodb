@@ -114,3 +114,10 @@ outputs = {
 with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
     for key, item in outputs.items():
         output.write(f"{key}={item}\n")
+
+print("========== configuration result ==========")
+print("[OK] configuration resolved")
+print(f"tag={tag}")
+print(f"build={'enabled' if build_enabled else 'disabled'}")
+print(f"aliyun_push={'ready' if aliyun else 'skipped'}")
+print(f"release={'ready' if can_release else 'skipped'}")

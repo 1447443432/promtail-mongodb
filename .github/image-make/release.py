@@ -68,3 +68,8 @@ with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
         summary.write("HAP Webhook skipped: HAP_WEBHOOK_URL is missing.\n")
     else:
         summary.write("HAP Webhook: configured; see the notification step for the request result.\n")
+
+print("========== release manifest ==========")
+print("[OK] release manifest created")
+print(f"tag={tag}")
+print(f"archives={len(images)}")

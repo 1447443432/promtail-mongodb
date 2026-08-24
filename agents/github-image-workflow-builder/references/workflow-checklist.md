@@ -28,6 +28,7 @@
 - [ ] buildx Builder 显式可用
 - [ ] 正常构建 Job 的可视步骤已合并，登录和 Builder 初始化不重复展示
 - [ ] 成功构建不刷屏输出完整 BuildKit 日志，失败时保留可定位错误日志
+- [ ] Push、Pull、打包、manifest 和 Webhook 输出统一的阶段标题与成功/失败标记
 - [ ] 构建参数传入正确架构的 `BASE_IMAGE`
 - [ ] 没有意外创建统一多架构 manifest
 

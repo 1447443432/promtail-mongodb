@@ -296,7 +296,14 @@ jobs:
       - name: Notify HAP Webhook
         if: ${{ needs.config.outputs.hap_enabled == 'true' && env.HAP_WEBHOOK_URL != '' }}
         run: |
+          echo "========== HAP Webhook =========="
+          echo "[INFO] notifying HAP Webhook..."
           headers=(-H 'Content-Type: application/json')
           [[ -z "${HAP_WEBHOOK_APP_KEY:-}" ]] || headers+=(-H "AppKey: $HAP_WEBHOOK_APP_KEY")
           [[ -z "${HAP_WEBHOOK_SIGN:-}" ]] || headers+=(-H "Sign: $HAP_WEBHOOK_SIGN")
-          curl --fail-with-body --retry 2 --connect-timeout 10 --max-time 60 -sS -X POST "$HAP_WEBHOOK_URL" "${headers[@]}" --data-binary @release-assets/release-manifest.json
+          if curl --fail-with-body --retry 2 --connect-timeout 10 --max-time 60 -sS -X POST "$HAP_WEBHOOK_URL" "${headers[@]}" --data-binary @release-assets/release-manifest.json; then
+            echo "[OK] HAP Webhook"
+          else
+            echo "[ERROR] HAP Webhook failed"
+            exit 1
+          fi

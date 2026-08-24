@@ -2,12 +2,18 @@
 set -euo pipefail
 
 if [[ -n "${BASE_REGISTRY_USERNAME:-}" && -n "${BASE_REGISTRY_PASSWORD:-}" ]]; then
+  echo "========== base registry login =========="
+  echo "[INFO] logging in to base registry..."
   base_registry="${BASE_IMAGE%%/*}"
-  printf '%s' "$BASE_REGISTRY_PASSWORD" | docker login "$base_registry" --username "$BASE_REGISTRY_USERNAME" --password-stdin
+  printf '%s' "$BASE_REGISTRY_PASSWORD" | docker login "$base_registry" --username "$BASE_REGISTRY_USERNAME" --password-stdin >/dev/null
+  echo "[OK] base registry login"
 fi
 
 if [[ "$PUSH_ALIYUN" == true ]]; then
-  printf '%s' "$ALIYUN_PASSWORD" | docker login "$ALIYUN_REGISTRY" --username "$ALIYUN_USERNAME" --password-stdin
+  echo "========== Aliyun registry login =========="
+  echo "[INFO] logging in to Aliyun registry..."
+  printf '%s' "$ALIYUN_PASSWORD" | docker login "$ALIYUN_REGISTRY" --username "$ALIYUN_USERNAME" --password-stdin >/dev/null
+  echo "[OK] Aliyun registry login"
 fi
 
 builder="image-make-${ARCHITECTURE}"
@@ -42,18 +48,34 @@ if [[ -z "$aliyun_image" || "$aliyun_image" == ":${TARGET_IMAGE##*:}" ]]; then
   aliyun_image="${ALIYUN_REGISTRY}/${ALIYUN_NAMESPACE}/${image_name}:${TARGET_IMAGE##*:}"
 fi
 if [[ "$PUSH_ALIYUN" == true ]]; then
+  echo "========== docker push =========="
+  echo "[INFO] pushing $aliyun_image..."
   docker tag "$TARGET_IMAGE" "$aliyun_image"
-  docker push "$aliyun_image"
+  push_log="push-${ARCHITECTURE}.log"
+  if ! docker push "$aliyun_image" >"$push_log" 2>&1; then
+    echo "[ERROR] docker push failed"
+    tail -n 100 "$push_log"
+    exit 1
+  fi
+  echo "[OK] docker push"
 fi
 
 image_name="${TARGET_IMAGE%:*}"
 image_name="${image_name##*/}"
 if [[ "$RELEASE_ENABLED" == true ]]; then
+  echo "========== image package =========="
+  echo "[INFO] saving local image..."
   mkdir -p release-assets
   archive="release-assets/${image_name}_${RELEASE_TAG}.tar.gz"
   docker save "$TARGET_IMAGE" | gzip -9 > "$archive"
   sha256sum "$archive" > "$archive.sha256"
+  echo "[OK] image package: $archive"
 fi
+
+echo "========== build result =========="
+echo "BUILD SUCCESS"
+echo "image=$TARGET_IMAGE"
+echo "arch=$ARCHITECTURE"
 
 {
   echo "## Build $ARCHITECTURE summary"
