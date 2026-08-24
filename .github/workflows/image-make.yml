@@ -14,7 +14,7 @@ on:
         type: choice
         options: [build-release, pull-release, build-push-release]
       tag:
-        description: "可选的 GitHub Release Tag；留空时使用 Repository Variable 或 .image-build.env 的 IMAGE_TAG"
+        description: "可选的 GitHub Release Tag；留空时使用 latest。不会自动追加到镜像地址"
         required: false
         default: ''
         type: string
@@ -29,12 +29,12 @@ on:
         default: true
         type: boolean
       target_image_amd64:
-        description: "主 amd64 镜像地址；为空时是latest"
+        description: "主 amd64 镜像地址；留空时使用配置中的主镜像地址，地址未带 Tag 时 Docker 使用 latest"
         required: false
         default: ''
         type: string
       target_image_arm64:
-        description: "主 arm64 镜像地址；为空时是latest"
+        description: "主 arm64 镜像地址；留空时使用配置中的主镜像地址，地址未带 Tag 时 Docker 使用 latest"
         required: false
         default: ''
         type: string
@@ -44,17 +44,17 @@ on:
         default: false
         type: boolean
       aliyun_namespace:
-        description: "阿里云命名空间"
+        description: "阿里云命名空间；启用 Push 时必填，不用于自动生成镜像地址"
         required: false
         default: ''
         type: string
       aliyun_image_amd64:
-        description: "可选的阿里云 amd64 镜像地址；为空时是latest"
+        description: "可选的阿里云 amd64 镜像地址；留空时复用主 amd64 镜像地址，填写后按原样使用"
         required: false
         default: ''
         type: string
       aliyun_image_arm64:
-        description: "可选的阿里云 arm64 镜像地址；为空时是latest"
+        description: "可选的阿里云 arm64 镜像地址；留空时复用主 arm64 镜像地址，填写后按原样使用"
         required: false
         default: ''
         type: string

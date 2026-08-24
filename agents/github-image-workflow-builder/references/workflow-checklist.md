@@ -13,6 +13,7 @@
 - [ ] `IMAGE_TAG` 可由配置覆盖
 - [ ] `workflow_dispatch` 的 `tag` 入参可省略，未配置时使用 `latest`
 - [ ] 镜像地址不带 Tag 时由 Docker 使用 `latest`，脚本不自动追加 Tag
+- [ ] 阿里云目标地址留空时复用对应主镜像完整引用
 - [ ] `RELEASE_NAME` 可由配置覆盖
 - [ ] `BASE_IMAGE_AMD64` 与 `BASE_IMAGE_ARM64` 独立
 - [ ] 主镜像名不要求认证

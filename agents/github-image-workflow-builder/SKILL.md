@@ -39,7 +39,7 @@ metadata:
 3. 基础镜像按架构独立配置：`BASE_IMAGE_AMD64` 和 `BASE_IMAGE_ARM64` 可以完全不同，不能通过字符串替换猜测 arm64 镜像。
 4. Dockerfile 保持手动可构建：默认值应允许 `docker build .` 在当前平台工作；CI 通过 `--build-arg BASE_IMAGE=...` 覆盖架构基础镜像。
 5. 主镜像名只作为本地 Build、Save 和 Release 中的镜像引用：不为主镜像名登录或推送，除非用户明确要求主仓库 Push。镜像引用可以不带 Tag；不带 Tag 时由 Docker 按 `latest` 解析，脚本不得拼接 `:latest` 或其他 Tag。
-6. 阿里云 Push 是独立可选模块：只有地址、命名空间和账号密码齐全时执行 `docker tag` 与 `docker push`；目标地址按用户配置原样使用，不得从主镜像名或 Release tag 推导 Tag；缺少配置时跳过 Push，但不能阻断 Build 或使用主镜像生成 Release。
+6. 阿里云 Push 是独立可选模块：只有命名空间和账号密码齐全时执行 `docker tag` 与 `docker push`；阿里云目标地址留空时复用对应主镜像的完整引用，填写后按用户配置原样使用，不得单独默认成 `latest` 或从 Release tag 推导 Tag。Workflow 输入说明必须明确这一点；缺少配置时跳过 Push，但不能阻断 Build 或使用主镜像生成 Release。
 7. Release 选择镜像来源：有阿里云 Push 时优先从阿里云镜像打包；没有阿里云配置时使用构建出的本地镜像 Artifact。Release-only 模式无法访问本地 Build 时，必须明确要求可拉取的阿里云镜像，或先执行 Build。
 8. HAP Webhook 必须使用 nginx-make 兼容的通用 JSON 协议：固定输出 `project_name`、`repository`、`version`、`tag`、`release_url`、`amd64_name`、`amd64_url`、`amd64_sha256`、`arm64_name`、`arm64_url`、`arm64_sha256`、`attachment_urls`、`commit_sha`、`run_id`、`run_url`、`build_status`；其中 `attachment_urls` 是 JSON 字符串，不是 JSON 数组。项目名从 `RELEASE_NAME` 或仓库名推导，不能把项目字段硬编码到 CI 引擎。
 9. HAP Webhook URL 为空或开关关闭时只跳过通知，并在 `$GITHUB_STEP_SUMMARY` 写出明确原因；不能因为 URL 为空而让 Release 失败。通知只在 Release 成功后发送。
@@ -110,7 +110,7 @@ BUILD_CONTEXT
 
 GitHub 配置入口统一为 `Settings → Secrets and variables → Actions`：非敏感项放 `Variables`，账号密码、Webhook URL、AppKey 和 Sign 放 `Secrets`。HAP 至少需要 `HAP_WEBHOOK_URL` 和 `ENABLE_HAP_WEBHOOK=true`；`HAP_WEBHOOK_APP_KEY`、`HAP_WEBHOOK_SIGN` 按接收端要求配置。配置后必须通过 `Actions → Image Make → Run workflow` 手动验证，并检查 config/Release Summary 的启用、跳过原因和 HAP 请求结果。
 
-README 必须区分三类默认值：手动 `workflow_dispatch` 输入默认值、项目 `.image-build.env` 默认值，以及没有默认值的必填配置。`tag` 入参可省略，未配置 `IMAGE_TAG` 时使用 `latest`。镜像地址可以不带 Tag，由 Docker 解析为 `latest`；Workflow 和脚本不得自行追加 Tag。通用 Workflow 不得伪造项目镜像名；镜像地址、namespace 等未配置时必须写明实际跳过行为。
+README 必须区分三类默认值：手动 `workflow_dispatch` 输入默认值、项目 `.image-build.env` 默认值，以及没有默认值的必填配置。手动 `tag` 入参可省略，留空直接使用 `latest`，不回退到项目 `IMAGE_TAG`；push 事件才读取 Repository Variable 或 `.image-build.env` 的 `IMAGE_TAG`。镜像地址可以不带 Tag，由 Docker 解析为 `latest`；Workflow 和脚本不得自行追加 Tag。通用 Workflow 不得伪造项目镜像名；镜像地址、namespace 等未配置时必须写明实际跳过行为。
 
 ## 通用性审计
 

@@ -30,7 +30,10 @@ def value(key, input_key=None, variable_key=None, default=""):
     return config.get(key, default).strip()
 
 
-tag = value("IMAGE_TAG", "INPUT_TAG", "VAR_IMAGE_TAG", "latest")
+if event != "push":
+    tag = os.environ.get("INPUT_TAG", "").strip() or "latest"
+else:
+    tag = value("IMAGE_TAG", None, "VAR_IMAGE_TAG", "latest")
 repository_name = os.environ.get("GITHUB_REPOSITORY", "image").rsplit("/", 1)[-1]
 release_name = value("RELEASE_NAME", None, "VAR_RELEASE_NAME", repository_name)
 base_amd64 = value("BASE_IMAGE_AMD64", None, "VAR_BASE_IMAGE_AMD64")
@@ -41,6 +44,8 @@ aliyun_namespace = value("ALIYUN_NAMESPACE", "INPUT_ALIYUN_NAMESPACE", "VAR_ALIY
 aliyun_registry = value("ALIYUN_REGISTRY", None, "VAR_ALIYUN_REGISTRY")
 aliyun_amd64 = value("ALIYUN_IMAGE_AMD64", "INPUT_ALIYUN_IMAGE_AMD64", "VAR_ALIYUN_IMAGE_AMD64")
 aliyun_arm64 = value("ALIYUN_IMAGE_ARM64", "INPUT_ALIYUN_IMAGE_ARM64", "VAR_ALIYUN_IMAGE_ARM64")
+aliyun_amd64 = aliyun_amd64 or target_amd64
+aliyun_arm64 = aliyun_arm64 or target_arm64
 dockerfile = config.get("DOCKERFILE", "Dockerfile").strip()
 build_context = config.get("BUILD_CONTEXT", ".").strip()
 alpine_mirror = config.get("ALPINE_MIRROR", "https://mirrors.aliyun.com/alpine").strip()
