@@ -22,6 +22,7 @@
 - [ ] 账号、密码、签名未写入仓库
 - [ ] README 说明 GitHub Variables/Secrets 的准确入口和字段名
 - [ ] HAP URL、AppKey、Sign 的配置位置和可选性已说明
+- [ ] README 区分 workflow 输入默认值、项目配置默认值和无默认值字段
 - [ ] 没有使用 `DOCKER_CONTEXT` 作为构建目录变量
 - [ ] Alpine 源和版本通过 `ALPINE_MIRROR`、`ALPINE_VERSION` 配置
 - [ ] Dockerfile 没有重复执行 `apk update` 后再 `apk add --no-cache`

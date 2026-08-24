@@ -149,6 +149,53 @@ GitHub Actions 会根据矩阵自动传入 `TARGETARCH=amd64` 或 `TARGETARCH=ar
 3. `.image-build.env`
 4. Workflow 默认值
 
+### 默认值与必填规则
+
+需要注意：手动 `Run workflow` 页面显示的默认值，只对本次手动运行生效；`.image-build.env` 是项目级默认配置；Workflow 引擎本身不保存具体项目的镜像仓库默认值。
+
+手动运行输入的默认值：
+
+| 输入 | 默认值 | 是否必填 | 说明 |
+|---|---|---|---|
+| `operation` | `build-and-release` | 是 | `build-only`、`build-and-release` 或 `release-only` |
+| `tag` | `1.0.0` | 是 | 镜像 tag 和 Release tag |
+| `platforms` | `linux/amd64,linux/arm64` | 是 | 参与构建的平台 |
+| `build_image` | `true` | 是 | 是否启用构建模块 |
+| `push_aliyun` | `false` | 是 | 是否启用阿里云 Push；还必须满足阿里云配置完整 |
+| `create_release` | `true` | 是 | 是否创建 GitHub Release |
+| `notify_hap` | `false` | 是 | 是否启用 HAP 通知；还必须配置 Webhook URL |
+| `target_image_amd64` | 空 | 否 | 空时使用 `.image-build.env`、Repository Variable 或最终默认值；没有最终镜像名会跳过构建 |
+| `target_image_arm64` | 空 | 否 | 同上 |
+| `aliyun_namespace` | 空 | 否 | 空时使用 `.image-build.env` 或 Repository Variable；没有完整阿里云配置只跳过 Push |
+| `aliyun_image_amd64` | 空 | 否 | 空时按主镜像最后一段自动生成 |
+| `aliyun_image_arm64` | 空 | 否 | 空时按主镜像最后一段自动生成 |
+
+当前项目 `.image-build.env` 中的默认值如下：
+
+```text
+IMAGE_TAG=1.0.0
+RELEASE_NAME=hap-promtail-vlogs-mongodb
+BASE_IMAGE_AMD64=alpine:3.23
+BASE_IMAGE_ARM64=alpine:3.23
+TARGET_IMAGE_AMD64=registry.cn-hangzhou.aliyuncs.com/hap-mdy/hap-promtail-vlogs-mongodb-amd64
+TARGET_IMAGE_ARM64=registry.cn-hangzhou.aliyuncs.com/hap-mdy/hap-promtail-vlogs-mongodb-arm64
+ALIYUN_REGISTRY=registry.cn-hangzhou.aliyuncs.com
+ALIYUN_NAMESPACE=hap-mdy
+ENABLE_BUILD=true
+ENABLE_ALIYUN_PUSH=true
+ENABLE_RELEASE=true
+ENABLE_HAP_WEBHOOK=true
+```
+
+没有默认值的配置：
+
+- `HAP_WEBHOOK_URL`：没有默认值；为空时跳过 HAP 通知，并显示原因。
+- `ALIYUN_REGISTRY_USERNAME`、`ALIYUN_REGISTRY_PASSWORD`：没有默认值；任一缺失时跳过阿里云 Push，但不阻断 Build 或 Release。
+- `BASE_REGISTRY_USERNAME`、`BASE_REGISTRY_PASSWORD`：没有默认值；只有基础镜像仓库为私有仓库时才需要。
+- `TARGET_IMAGE_AMD64`、`TARGET_IMAGE_ARM64`：通用 Workflow 没有默认镜像名；当前项目的默认值来自 `.image-build.env`。复制到其他项目时必须替换成新项目的镜像名。
+
+Dockerfile 的 `BASE_IMAGE` 默认值 `alpine:3.23` 只保证手动 `docker build .` 可用；CI 配置仍要求 `BASE_IMAGE_AMD64` 和 `BASE_IMAGE_ARM64` 都能解析到有效值，以避免架构基础镜像配置不明确。
+
 ## GitHub Actions 配置方法
 
 所有 GitHub 端的配置入口都在仓库的：

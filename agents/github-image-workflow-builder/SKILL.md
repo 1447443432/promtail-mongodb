@@ -108,6 +108,8 @@ BUILD_CONTEXT
 
 GitHub 配置入口统一为 `Settings → Secrets and variables → Actions`：非敏感项放 `Variables`，账号密码、Webhook URL、AppKey 和 Sign 放 `Secrets`。HAP 至少需要 `HAP_WEBHOOK_URL` 和 `ENABLE_HAP_WEBHOOK=true`；`HAP_WEBHOOK_APP_KEY`、`HAP_WEBHOOK_SIGN` 按接收端要求配置。配置后必须通过 `Actions → Image Make → Run workflow` 手动验证，并检查 config/Release Summary 的启用、跳过原因和 HAP 请求结果。
 
+README 必须区分三类默认值：手动 `workflow_dispatch` 输入默认值、项目 `.image-build.env` 默认值，以及没有默认值的必填配置。通用 Workflow 不得伪造项目镜像名；镜像地址、namespace 等未配置时必须写明“无默认值”和实际跳过行为。
+
 ## 通用性审计
 
 完成后必须对 Workflow 和 CI 脚本做一次项目脱敏检查：
