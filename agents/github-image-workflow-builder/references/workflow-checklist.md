@@ -18,7 +18,9 @@
 - [ ] `RELEASE_NAME` 可由配置覆盖
 - [ ] `BASE_IMAGE_AMD64` 与 `BASE_IMAGE_ARM64` 独立
 - [ ] 主镜像名不要求认证
-- [ ] Aliyun Registry、账号密码缺失时只跳过 Push
+- [ ] `build-release` 不依赖 Aliyun 配置
+- [ ] `build-push-release` 缺少 `ENABLE_ALIYUN_PUSH`、Registry、账号密码或目标镜像时阻断 Build/Package/Release
+- [ ] `pull-release` 不依赖 `ENABLE_ALIYUN_PUSH`，但要求完整的 Aliyun Registry、账号密码和镜像地址
 - [ ] HAP URL 缺失时只跳过通知
 - [ ] HAP payload 使用 nginx-make 兼容固定字段
 - [ ] `attachment_urls` 是 JSON 字符串，且只包含实际 Release 附件 URL
@@ -27,6 +29,9 @@
 - [ ] README 说明 GitHub Variables/Secrets 的准确入口和字段名
 - [ ] HAP URL、AppKey、Sign 的配置位置和可选性已说明
 - [ ] README 区分 workflow 输入默认值、项目配置默认值和无默认值字段
+- [ ] Workflow 全局权限为 `contents: read`，只有 Release Job 使用 `contents: write`
+- [ ] HAP URL 仅提供给配置检查和 Release；AppKey/Sign 仅提供给通知步骤
+- [ ] 第三方 Action 固定到 commit SHA，Docker Action 固定到镜像 digest
 - [ ] 没有使用 `DOCKER_CONTEXT` 作为构建目录变量
 - [ ] Alpine 源和版本通过 `ALPINE_MIRROR`、`ALPINE_VERSION` 配置
 - [ ] Dockerfile 没有重复执行 `apk update` 后再 `apk add --no-cache`
@@ -50,9 +55,9 @@
 - [ ] 文件名形如 `<镜像最后一段>_<tag>.tar.gz`
 - [ ] 下游下载的 Artifact 名称与上游一致
 - [ ] Release manifest 能从文件名识别架构
-- [ ] Aliyun 可用时 Release 使用 Aliyun 镜像引用
-- [ ] Aliyun 不可用时 Release 使用主镜像引用
-- [ ] `published_images` 只列实际 Push 成功的镜像
+- [ ] `build-push-release` 和 `pull-release` 的 Release 清单使用 Aliyun 镜像引用
+- [ ] `build-release` 的 Release 清单使用主镜像引用
+- [ ] Release 清单只包含实际生成的架构附件和 SHA256
 
 ## Summary 和回归
 
@@ -66,5 +71,8 @@
 - [ ] 检查手动 build-push-release
 - [ ] 检查 Aliyun 缺账号密码
 - [ ] 检查 HAP URL 为空
+- [ ] `actionlint` 检查通过
+- [ ] `python .github/image-make/test_release.py` 检查通过
+- [ ] 需要阻断合并时，Branch Protection 已将 Workflow Lint 设为必需检查
 - [ ] 用 `rg` 对 Workflow 和 CI 脚本执行项目个性化字符串审计
 - [ ] 确认复制到第二个项目时只需修改 `.image-build.env` 和 Dockerfile

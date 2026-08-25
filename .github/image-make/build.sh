@@ -4,7 +4,14 @@ set -euo pipefail
 if [[ -n "${BASE_REGISTRY_USERNAME:-}" && -n "${BASE_REGISTRY_PASSWORD:-}" ]]; then
   echo "========== base registry login =========="
   echo "[INFO] logging in to base registry..."
-  base_registry="${BASE_IMAGE%%/*}"
+  if [[ "$BASE_IMAGE" != */* ]]; then
+    base_registry="docker.io"
+  else
+    base_registry="${BASE_IMAGE%%/*}"
+    if [[ "$base_registry" != *.* && "$base_registry" != *:* && "$base_registry" != "localhost" ]]; then
+      base_registry="docker.io"
+    fi
+  fi
   printf '%s' "$BASE_REGISTRY_PASSWORD" | docker login "$base_registry" --username "$BASE_REGISTRY_USERNAME" --password-stdin >/dev/null
   echo "[OK] base registry login"
 fi

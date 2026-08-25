@@ -60,14 +60,14 @@ env:
   WORKFLOW_ARCHITECTURES: ${{ github.event_name == 'push' && 'all' || inputs.architectures }}
   REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME || secrets.ALIYUN_REGISTRY_USERNAME }}
   REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD || secrets.ALIYUN_REGISTRY_PASSWORD }}
-  HAP_WEBHOOK_URL: ${{ secrets.HAP_WEBHOOK_URL }}
-  HAP_WEBHOOK_APP_KEY: ${{ secrets.HAP_WEBHOOK_APP_KEY }}
-  HAP_WEBHOOK_SIGN: ${{ secrets.HAP_WEBHOOK_SIGN }}
   BASE_REGISTRY_USERNAME: ${{ secrets.BASE_REGISTRY_USERNAME }}
   BASE_REGISTRY_PASSWORD: ${{ secrets.BASE_REGISTRY_PASSWORD }}
   ALIYUN_REGISTRY: ${{ vars.ALIYUN_REGISTRY }}
   ALIYUN_REGISTRY_USERNAME: ${{ secrets.ALIYUN_REGISTRY_USERNAME }}
   ALIYUN_REGISTRY_PASSWORD: ${{ secrets.ALIYUN_REGISTRY_PASSWORD }}
+
+permissions:
+  contents: read
 
 jobs:
   config:
@@ -84,6 +84,7 @@ jobs:
       aliyun_registry: ${{ steps.check.outputs.aliyun_registry }}
       aliyun_push_enabled: ${{ steps.check.outputs.aliyun_push_enabled }}
       aliyun_pull_enabled: ${{ steps.check.outputs.aliyun_pull_enabled }}
+      release_image_source: ${{ steps.check.outputs.release_image_source }}
       release_enabled: ${{ steps.check.outputs.release_enabled }}
       hap_enabled: ${{ steps.check.outputs.hap_enabled }}
       dockerfile: ${{ steps.check.outputs.dockerfile }}
@@ -98,7 +99,7 @@ jobs:
       can_package: ${{ steps.check.outputs.can_package }}
       can_release: ${{ steps.check.outputs.can_release }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
       - id: check
         env:
           CONFIG_FILE: .image-build.env
@@ -127,7 +128,7 @@ jobs:
           ALIYUN_REGISTRY: ${{ env.ALIYUN_REGISTRY }}
           OPERATION: ${{ env.WORKFLOW_OPERATION }}
           WORKFLOW_ARCHITECTURES: ${{ env.WORKFLOW_ARCHITECTURES }}
-          HAP_WEBHOOK_URL: ${{ env.HAP_WEBHOOK_URL }}
+          HAP_WEBHOOK_URL: ${{ secrets.HAP_WEBHOOK_URL }}
         run: python3 .github/image-make/config.py
 
   build:
@@ -141,7 +142,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
       - name: Build architecture image
         env:
           ARCHITECTURE: ${{ matrix.architecture }}
@@ -166,7 +167,7 @@ jobs:
         run: bash .github/image-make/build.sh
       - name: Upload locally built image package
         if: ${{ needs.config.outputs.release_enabled == 'true' }}
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: release-${{ matrix.architecture }}
           path: release-assets/*
@@ -183,10 +184,10 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
       - name: Download packages from build jobs
         if: ${{ github.event_name == 'push' || inputs.operation == 'build-release' || inputs.operation == 'build-push-release' }}
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: release-${{ matrix.architecture }}
           path: release-assets
@@ -204,7 +205,7 @@ jobs:
         run: bash .github/image-make/package.sh
       - name: Upload pull-release package
         if: ${{ github.event_name != 'push' && inputs.operation == 'pull-release' }}
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: release-${{ matrix.architecture }}
           path: release-assets/*
@@ -217,8 +218,8 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/download-artifact@v8
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           pattern: release-*
           path: release-assets
@@ -232,11 +233,11 @@ jobs:
           ALIYUN_IMAGE_AMD64: ${{ needs.config.outputs.aliyun_image_amd64 }}
           ALIYUN_IMAGE_ARM64: ${{ needs.config.outputs.aliyun_image_arm64 }}
           ALIYUN_REGISTRY: ${{ needs.config.outputs.aliyun_registry }}
-          PUSH_ALIYUN: ${{ needs.config.outputs.can_aliyun }}
+          RELEASE_IMAGE_SOURCE: ${{ needs.config.outputs.release_image_source }}
           HAP_ENABLED: ${{ needs.config.outputs.hap_enabled }}
-          HAP_WEBHOOK_URL: ${{ env.HAP_WEBHOOK_URL }}
+          HAP_WEBHOOK_URL: ${{ secrets.HAP_WEBHOOK_URL }}
         run: python3 .github/image-make/release.py
-      - uses: softprops/action-gh-release@v3
+      - uses: softprops/action-gh-release@c12583777ecdfd3be55c69cf75464299dc01057e
         with:
           tag_name: ${{ needs.config.outputs.tag }}
           name: ${{ needs.config.outputs.tag }}
@@ -244,6 +245,10 @@ jobs:
           files: release-assets/*
       - name: Notify HAP Webhook
         if: ${{ needs.config.outputs.hap_enabled == 'true' && env.HAP_WEBHOOK_URL != '' }}
+        env:
+          HAP_WEBHOOK_URL: ${{ secrets.HAP_WEBHOOK_URL }}
+          HAP_WEBHOOK_APP_KEY: ${{ secrets.HAP_WEBHOOK_APP_KEY }}
+          HAP_WEBHOOK_SIGN: ${{ secrets.HAP_WEBHOOK_SIGN }}
         run: |
           echo "========== HAP Webhook =========="
           echo "[INFO] notifying HAP Webhook..."

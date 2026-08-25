@@ -26,7 +26,7 @@ docker push 阿里云镜像
 阿里云：registry.cn-hangzhou.aliyuncs.com/hap-mdy/hap-promtail-vlogs-mongodb-amd64:1.0.0
 ```
 
-没有配置阿里云地址或账号密码时，只跳过阿里云 Push；构建仍然执行，Release 使用主镜像打包。配置阿里云后，Release 优先从阿里云镜像打包。
+没有配置阿里云地址或账号密码时，`build-release` 仍然使用主镜像构建和发布；`build-push-release` 会直接跳过构建、打包和发布，并在 Actions Summary 中列出缺失配置。`pull-release` 只在阿里云地址、账号密码和镜像地址完整时执行。配置完整后，Push 或 Pull 产生的 Release 清单会记录实际使用的阿里云镜像地址。
 
 ## Workflow 运行模式
 
@@ -50,6 +50,7 @@ docker push 阿里云镜像
 `pull-release` 需要提前存在可拉取的阿里云镜像和完整的阿里云凭据。如果只想构建而不创建 Release，可将 `create_release` 关闭；`build-release` 本身会创建 Release。
 
 手动运行时可以不填写 `tag`，留空直接使用 `latest`；自动提交时使用 Repository Variable 或 `.image-build.env` 的 `IMAGE_TAG`，都未配置时使用 `latest`。
+Tag 只用于 GitHub Release 和附件文件名，允许字母、数字、`.`、`_`、`-`；不支持 `/`、空格等字符。
 
 ## 架构基础镜像
 
@@ -72,7 +73,7 @@ docker build -t promtail-mongodb:amd64 .
 docker build --build-arg BASE_IMAGE=another.example.com/base/arm64-runtime:3.23 -t promtail-mongodb:arm64 .
 ```
 
-如果基础镜像仓库是私有仓库，可配置 Secrets `BASE_REGISTRY_USERNAME` 和 `BASE_REGISTRY_PASSWORD`。Workflow 会从当前架构的 `BASE_IMAGE_*` 地址自动解析 Registry 并在构建前登录，不需要额外配置 `BASE_REGISTRY_*`。
+如果基础镜像仓库是私有仓库，可配置 Secrets `BASE_REGISTRY_USERNAME` 和 `BASE_REGISTRY_PASSWORD`。Workflow 会从当前架构的 `BASE_IMAGE_*` 地址自动解析 Registry 并在构建前登录，不需要额外配置基础镜像 Registry 地址。
 
 阿里云配置：
 
@@ -182,7 +183,7 @@ ENABLE_HAP_WEBHOOK=true
 没有默认值的配置：
 
 - `HAP_WEBHOOK_URL`：没有默认值；为空时跳过 HAP 通知，并显示原因。
-- `ALIYUN_REGISTRY_USERNAME`、`ALIYUN_REGISTRY_PASSWORD`：没有默认值；任一缺失时跳过阿里云 Push，但不阻断 Build 或 Release。
+- `ALIYUN_REGISTRY_USERNAME`、`ALIYUN_REGISTRY_PASSWORD`：没有默认值；`build-push-release` 或 `pull-release` 使用时必填。缺失时 `build-release` 不受影响，另外两种模式会停止后续步骤。
 - `BASE_REGISTRY_USERNAME`、`BASE_REGISTRY_PASSWORD`：没有默认值；只有基础镜像仓库为私有仓库时才需要。
 - `TARGET_IMAGE_AMD64`、`TARGET_IMAGE_ARM64`：通用 Workflow 没有默认镜像地址；当前项目的默认值来自 `.image-build.env`，地址按原样使用。复制到其他项目时必须替换成新项目的镜像地址。
 
@@ -203,6 +204,7 @@ Actions → Image Make → Run workflow
 ```
 
 手动执行一次验证。不要把密码、Webhook URL、AppKey 或 Sign 写入 README、`.image-build.env` 或 Workflow 文件。
+Workflow 只在配置检查和 Release 相关步骤使用 HAP Secret；构建和 Package Job 不接收 HAP AppKey、Sign 等通知凭据。
 
 ### Repository Variables（可选覆盖项）
 
@@ -231,8 +233,8 @@ Secrets 用于敏感配置。在 `Settings → Secrets and variables → Actions
 
 | Name | 是否必需 | 作用 |
 |---|---|---|
-| `ALIYUN_REGISTRY_USERNAME` | 使用阿里云 Push 时必需 | 阿里云 Registry 用户名 |
-| `ALIYUN_REGISTRY_PASSWORD` | 使用阿里云 Push 时必需 | 阿里云 Registry 密码或 Access Token |
+| `ALIYUN_REGISTRY_USERNAME` | 使用阿里云 Push/Pull 时必需 | 阿里云 Registry 用户名 |
+| `ALIYUN_REGISTRY_PASSWORD` | 使用阿里云 Push/Pull 时必需 | 阿里云 Registry 密码或 Access Token |
 | `BASE_REGISTRY_USERNAME` | 基础镜像仓库私有时必需 | 基础镜像 Registry 用户名 |
 | `BASE_REGISTRY_PASSWORD` | 基础镜像仓库私有时必需 | 基础镜像 Registry 密码或 Token |
 | `HAP_WEBHOOK_URL` | 启用 HAP 通知时必需 | HAP Webhook 接收地址 |
@@ -282,7 +284,7 @@ Repository Secrets:
   ALIYUN_REGISTRY_PASSWORD=<阿里云密码或 Token>
 ```
 
-阿里云 Registry、账号密码齐全时，Workflow 执行 `docker tag` 和 `docker push`；阿里云目标地址留空时复用对应主镜像地址，填写后按原样使用。缺少 Registry 或账号密码时，只跳过阿里云 Push，Build 和 Release 仍可继续；Release 会使用主镜像对应的本地构建产物。
+阿里云 Registry、账号密码齐全且 `ENABLE_ALIYUN_PUSH=true` 时，`build-push-release` 执行 `docker tag` 和 `docker push`；阿里云目标地址留空时复用对应主镜像地址，填写后按原样使用。缺少配置时，`build-release` 不受影响；`build-push-release` 会停止后续构建、打包和 Release，避免模式名称与实际行为不一致。`pull-release` 不依赖 `ENABLE_ALIYUN_PUSH`，只检查完整的阿里云拉取配置。
 
 ### 配置后的验证建议
 
@@ -292,10 +294,24 @@ Repository Secrets:
 2. 配置阿里云后用 `build-push-release` 验证 Tag、Push 和 Release 附件。
 3. 配置 HAP 后再次运行 `build-release` 或 `build-push-release`，检查 Release Job 的 `HAP sync` 和通知步骤。
 4. 检查 HAP 接收到的 `repository`、`version`、两个架构下载地址和 SHA256 是否正确。
+5. 修改 Workflow 或 `.github/image-make/` 后，检查 `Workflow Lint` 是否通过；它使用固定版本的 `actionlint` 检查 GitHub Actions 语法和表达式。
+6. 运行 `python .github/image-make/test_release.py`，检查 Release manifest 的镜像来源和 digest 镜像识别。
 
 如果某个可选模块没有配置，不要根据灰色步骤判断失败；查看 `Check module configuration` 和 `Release` 的 Actions Summary，其中会写明模块是关闭、缺少哪些配置，还是执行成功。
 
 配置 Job 会在执行前检查所有模块，并把启用、跳过及缺失字段写入 Actions Summary。
+
+### Workflow 静态检查
+
+`.github/workflows/actionlint.yml` 会在 Workflow、镜像辅助脚本或项目构建配置变更时运行。它只检查 GitHub Actions 定义，不会执行 Docker 构建；需要本地检查时也可以安装同版本 `actionlint` 后运行：
+
+```bash
+actionlint
+```
+
+Workflow 使用固定的 Action commit 和 actionlint 镜像 digest，升级依赖时应重新验证对应版本的行为。
+
+如果要求检查失败时禁止合并，请在 GitHub `Settings → Branches` 中将 `Workflow Lint / Validate GitHub Actions workflows` 设置为受保护分支的必需状态检查；单独的 Lint Workflow 不会自动阻止另一个 Workflow 启动。
 
 ## CI 专用脚本
 

@@ -19,16 +19,18 @@ tag = os.environ["RELEASE_TAG"]
 release_name = os.environ["RELEASE_NAME"]
 primary = {"amd64": os.environ["TARGET_IMAGE_AMD64"], "arm64": os.environ["TARGET_IMAGE_ARM64"]}
 aliyun = {"amd64": os.environ["ALIYUN_IMAGE_AMD64"], "arm64": os.environ["ALIYUN_IMAGE_ARM64"]}
+source = os.environ.get("RELEASE_IMAGE_SOURCE", "primary")
 
 base = f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/releases/download/{tag}"
 images = []
 for path in sorted(glob.glob("release-assets/*.tar.gz")):
     archive = os.path.basename(path)
     image_name = archive.removesuffix(f"_{tag}.tar.gz")
-    architecture = next((item for item in ("amd64", "arm64") if image_name == primary[item].rsplit("/", 1)[-1].rsplit(":", 1)[0]), "")
+    archive_image_name = image_name.split("@", 1)[0].rsplit(":", 1)[0]
+    architecture = next((item for item in ("amd64", "arm64") if archive_image_name == primary[item].rsplit("/", 1)[-1].split("@", 1)[0].rsplit(":", 1)[0]), "")
     if not architecture:
         raise RuntimeError(f"cannot determine architecture from archive: {archive}")
-    image = aliyun[architecture] if os.environ["PUSH_ALIYUN"] == "true" else primary[architecture]
+    image = aliyun[architecture] if source == "aliyun" else primary[architecture]
     images.append({
         "architecture": architecture,
         "platform": f"linux/{architecture}",

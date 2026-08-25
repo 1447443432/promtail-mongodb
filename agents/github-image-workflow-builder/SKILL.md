@@ -39,24 +39,30 @@ metadata:
 3. 基础镜像按架构独立配置：`BASE_IMAGE_AMD64` 和 `BASE_IMAGE_ARM64` 可以完全不同，不能通过字符串替换猜测 arm64 镜像。
 4. Dockerfile 保持手动可构建：默认值应允许 `docker build .` 在当前平台工作；CI 通过 `--build-arg BASE_IMAGE=...` 覆盖架构基础镜像。
 5. 主镜像名只作为本地 Build、Save 和 Release 中的镜像引用：不为主镜像名登录或推送，除非用户明确要求主仓库 Push。镜像引用可以不带 Tag；不带 Tag 时由 Docker 按 `latest` 解析，脚本不得拼接 `:latest` 或其他 Tag。
-6. 阿里云 Push 是独立可选模块：只有 Registry、账号密码齐全时执行 `docker tag` 与 `docker push`；阿里云目标地址留空时复用对应主镜像的完整引用，填写后按用户配置原样使用，不得单独默认成 `latest` 或从 Release tag 推导 Tag。Workflow 输入说明必须明确这一点；缺少配置时跳过 Push，但不能阻断 Build 或使用主镜像生成 Release。
-7. Release 选择镜像来源：有阿里云 Push 时优先从阿里云镜像打包；没有阿里云配置时使用构建出的本地镜像 Artifact。Release-only 模式无法访问本地 Build 时，必须明确要求可拉取的阿里云镜像，或先执行 Build。
-8. HAP Webhook 必须使用 nginx-make 兼容的通用 JSON 协议：固定输出 `project_name`、`repository`、`version`、`tag`、`release_url`、`amd64_name`、`amd64_url`、`amd64_sha256`、`arm64_name`、`arm64_url`、`arm64_sha256`、`attachment_urls`、`commit_sha`、`run_id`、`run_url`、`build_status`；其中 `attachment_urls` 是 JSON 字符串，不是 JSON 数组。项目名从 `RELEASE_NAME` 或仓库名推导，不能把项目字段硬编码到 CI 引擎。
-9. HAP Webhook URL 为空或开关关闭时只跳过通知，并在 `$GITHUB_STEP_SUMMARY` 写出明确原因；不能因为 URL 为空而让 Release 失败。通知只在 Release 成功后发送。
-10. 每个独立 Job 都必须 checkout 仓库。Job 之间只共享 Artifact 和 Job Outputs，不共享工作区文件。
-11. 不要使用保留环境变量名作为业务配置名。尤其不要把构建目录命名为 `DOCKER_CONTEXT`；Docker 会将其解释为 Docker Context 名称。使用 `BUILD_CONTEXT`。
-12. buildx 必须可靠初始化。不要依赖空的 `BUILDX_BUILDER` 或某个 Action 的隐式 Builder；构建脚本应明确选择或创建 Builder，并在构建时传 `--builder`。
-13. Artifact 名称按镜像最后一段和 Release tag 生成；Release tag 入参可省略，未配置时使用 `latest`，例如：
+6. 阿里云 Push 是独立模块：`build-push-release` 只有在 `ENABLE_ALIYUN_PUSH=true` 且 Registry、账号密码和目标镜像完整时才执行 `docker tag` 与 `docker push`；缺少配置时必须阻断该模式的 Build、Package 和 Release。`build-release` 不依赖阿里云配置。
+7. `pull-release` 不依赖 `ENABLE_ALIYUN_PUSH`，只要 Registry、账号密码、主镜像和阿里云镜像地址完整，就从阿里云拉取并打包；阿里云目标地址留空时复用对应主镜像的完整引用，填写后按用户配置原样使用，不得单独默认成 `latest` 或从 Release tag 推导 Tag。
+8. Release 选择镜像来源：`pull-release` 和 `build-push-release` 的清单记录阿里云镜像地址，`build-release` 记录主镜像地址。Release-only 模式无法访问本地 Build 时，必须明确要求可拉取的阿里云镜像，或先执行 Build。
+9. HAP Webhook 必须使用 nginx-make 兼容的通用 JSON 协议：固定输出 `project_name`、`repository`、`version`、`tag`、`release_url`、`amd64_name`、`amd64_url`、`amd64_sha256`、`arm64_name`、`arm64_url`、`arm64_sha256`、`attachment_urls`、`commit_sha`、`run_id`、`run_url`、`build_status`；其中 `attachment_urls` 是 JSON 字符串，不是 JSON 数组。项目名从 `RELEASE_NAME` 或仓库名推导，不能把项目字段硬编码到 CI 引擎。
+10. HAP Webhook URL 为空或开关关闭时只跳过通知，并在 `$GITHUB_STEP_SUMMARY` 写出明确原因；不能因为 URL 为空而让 Release 失败。通知只在 Release 成功后发送。
+11. 每个独立 Job 都必须 checkout 仓库。Job 之间只共享 Artifact 和 Job Outputs，不共享工作区文件。
+12. 不要使用保留环境变量名作为业务配置名。尤其不要把构建目录命名为 `DOCKER_CONTEXT`；Docker 会将其解释为 Docker Context 名称。使用 `BUILD_CONTEXT`。
+13. buildx 必须可靠初始化。不要依赖空的 `BUILDX_BUILDER` 或某个 Action 的隐式 Builder；构建脚本应明确选择或创建 Builder，并在构建时传 `--builder`。
+14. Artifact 名称按镜像最后一段和 Release tag 生成；Release tag 入参可省略，未配置时使用 `latest`，例如：
 
    ```text
    hap-promtail-vlogs-mongodb-amd64:1.0.0
    -> hap-promtail-vlogs-mongodb-amd64_1.0.0.tar.gz
    ```
-14. Actions UI 步骤保持精简：推荐每个构建 Job 只保留 checkout、一个包含登录/Builder/Build/Push/Save 的构建步骤和 Artifact 上传；不要为每个正常动作拆出大量可视步骤。失败原因写入日志和 Summary 即可。
-15. Alpine 源和版本应可配置：使用 `ALPINE_MIRROR`、`ALPINE_VERSION`，不要把源地址散落在多个文件中；删除 `apk update` 与 `apk add --no-cache` 的重复索引刷新。
-16. 所有自有 CI 脚本的成功日志都应参考 nginx-make 收敛：输出阶段标题、`[INFO]`、`[OK]` 和最终结果；Docker/BuildKit、Push、Pull 详细日志写入临时日志文件，失败时输出末尾足够定位问题的内容。第三方 Action 的系统日志不强行重写。
-17. Workflow 本身不得写入具体项目的镜像仓库、namespace 或 Release 名。项目个性化值放入 `.image-build.env`；未配置时使用仓库名推导 Release 名，镜像模块应明确跳过并说明原因。
-18. 如果项目内存在 Skill、文档或其他非构建目录，Workflow 的 push 触发器应通过 `paths-ignore` 排除这些目录；Skill 变更不应触发镜像构建，但仍应支持手动触发验证。
+15. Actions UI 步骤保持精简：推荐每个构建 Job 只保留 checkout、一个包含登录/Builder/Build/Push/Save 的构建步骤和 Artifact 上传；不要为每个正常动作拆出大量可视步骤。失败原因写入日志和 Summary 即可。
+16. Alpine 源和版本应可配置：使用 `ALPINE_MIRROR`、`ALPINE_VERSION`，不要把源地址散落在多个文件中；删除 `apk update` 与 `apk add --no-cache` 的重复索引刷新。
+17. 所有自有 CI 脚本的成功日志都应参考 nginx-make 收敛：输出阶段标题、`[INFO]`、`[OK]` 和最终结果；Docker/BuildKit、Push、Pull 详细日志写入临时日志文件，失败时输出末尾足够定位问题的内容。第三方 Action 的系统日志不强行重写。
+18. Workflow 本身不得写入具体项目的镜像仓库、namespace 或 Release 名。项目个性化值放入 `.image-build.env`；未配置时使用仓库名推导 Release 名，镜像模块应明确跳过并说明原因。
+19. 如果项目内存在 Skill、文档或其他非构建目录，Workflow 的 push 触发器应通过 `paths-ignore` 排除这些目录；Skill 变更不应触发镜像构建，但仍应支持手动触发验证。
+20. 使用固定版本的 `actionlint` 校验 `.github/workflows/`；Workflow、CI 辅助脚本或构建配置变更时应触发检查。静态检查只负责 Workflow 语法和表达式，不代替真实 Docker 构建。
+21. Release tag 必须限制为 `[A-Za-z0-9._-]+`，因为它同时用于 GitHub Release 标识和本地 Artifact 文件名；不要允许 `/`、空格或未处理的路径字符进入打包脚本。
+22. 如果 actionlint 必须阻断合并，必须在 GitHub Branch Protection 中将对应的 `Workflow Lint` 状态检查设为 required；独立的 Lint Workflow 不会自动阻止其他 Workflow 启动。
+23. 第三方 Action 必须固定到 commit SHA；Docker 形式的 Action 必须固定到镜像 digest，并在升级时重新执行静态检查和最小测试。
+24. Workflow 默认权限必须是 `contents: read`，只有创建或更新 Release 的 Job 才能提升到 `contents: write`。HAP URL 只提供给配置检查/Release，AppKey 和 Sign 只提供给通知步骤。
 
 ## 推荐目录
 
@@ -139,15 +145,18 @@ Summary 中不得输出密码、Token、Webhook 签名或完整 Secret 值。
 遇到失败时先按以下顺序定位：
 
 1. Workflow 是否解析成功，Job-level `if` 是否错误引用 `env`。
-2. config Job 的 Outputs 是否为空，Summary 是否说明具体缺失项。
-3. 失败 Job 是否 checkout 了仓库。
-4. `DOCKER_CONTEXT`、`DOCKER_HOST`、`BUILDX_BUILDER` 等环境变量是否污染 Docker CLI。
-5. setup-buildx 是否成功，构建脚本是否明确指定 Builder。
-6. 基础镜像是否真的存在、可访问且平台正确。
-7. Artifact 是否在上游成功上传，名称是否与下游下载名称一致。
-8. Release manifest 是否按实际 Artifact 文件名正确识别 amd64/arm64。
-9. HAP payload 是否包含固定字段、附件 URL 是否为 JSON 字符串、架构附件和 SHA256 是否来自实际 Release 产物。
-10. HAP 通知是否只在 URL 和开关都满足时执行。
+2. `actionlint` 是否通过，尤其检查表达式、Job 输出和矩阵配置。
+3. Release tag 是否通过安全文件名校验。
+4. config Job 的 Outputs 是否为空，Summary 是否说明具体缺失项。
+5. 失败 Job 是否 checkout 了仓库。
+6. `DOCKER_CONTEXT`、`DOCKER_HOST`、`BUILDX_BUILDER` 等环境变量是否污染 Docker CLI。
+7. 基础镜像 Registry 是否正确解析；Docker Hub 不应被当作镜像名登录。
+8. setup-buildx 是否成功，构建脚本是否明确指定 Builder。
+9. 基础镜像是否真的存在、可访问且平台正确。
+10. Artifact 是否在上游成功上传，名称是否与下游下载名称一致。
+11. Release manifest 是否按实际 Artifact 文件名正确识别 amd64/arm64 和实际镜像来源。
+12. HAP payload 是否包含固定字段、附件 URL 是否为 JSON 字符串、架构附件和 SHA256 是否来自实际 Release 产物。
+13. HAP 通知是否只在 URL 和开关都满足时执行。
 
 常见故障和对应检查见 [references/failure-patterns.md](references/failure-patterns.md)。完整交付检查见 [references/workflow-checklist.md](references/workflow-checklist.md)。
 
@@ -157,6 +166,8 @@ Summary 中不得输出密码、Token、Webhook 签名或完整 Secret 值。
 
 - Python `ast.parse` 或等价语法检查
 - `bash -n` 检查 CI Shell 脚本
+- `actionlint` 检查 GitHub Actions Workflow
+- `python .github/image-make/test_release.py` 检查 Release manifest 来源和 digest 镜像识别
 - `git diff --check`
 - 检查 Workflow 行为：push 触发、手动 build-release、手动 pull-release、手动 build-push-release、Aliyun 缺配置、HAP URL 缺失
 - 对 Workflow 和 CI 脚本执行通用性审计，确认没有残留当前项目默认值

@@ -1,0 +1,31 @@
+name: Workflow Lint
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - .github/workflows/**
+      - .github/image-make/**
+      - .image-build.env
+  pull_request:
+    paths:
+      - .github/workflows/**
+      - .github/image-make/**
+      - .image-build.env
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  actionlint:
+    name: Validate GitHub Actions workflows
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      - name: Run actionlint
+        uses: docker://rhysd/actionlint@sha256:9d36088643581e728c969f35141f88139fec77280b2be23c1f66f8e40e1025e7
+        with:
+          args: -color
+      - name: Test release manifest
+        run: python3 .github/image-make/test_release.py
