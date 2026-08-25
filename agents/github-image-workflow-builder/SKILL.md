@@ -67,6 +67,7 @@ Git push 与手动运行要区分：push 不接收 `workflow_dispatch` 的 `oper
 22. 如果 actionlint 必须阻断合并，必须在 GitHub Branch Protection 中将 `Image Make / Validate GitHub Actions workflows` 状态检查设为 required；同一 Workflow 内的 `needs: lint` 负责阻止当前 Push 继续构建。
 23. 第三方 Action 必须固定到 commit SHA；Docker 形式的 Action 必须固定到镜像 digest，并在升级时重新执行静态检查和最小测试。
 24. Workflow 默认权限必须是 `contents: read`，只有创建或更新 Release 的 Job 才能提升到 `contents: write`。HAP URL 只提供给配置检查/Release，AppKey 和 Sign 只提供给通知步骤。
+25. JavaScript Action 必须与当前 GitHub Actions Runner 的 Node.js 运行时兼容。出现 `Node.js 20 is deprecated` 或 `being forced to run on Node.js 24` 时，应定位对应的 Action 版本并升级到支持 Node.js 24 的版本，再固定完整 commit SHA；不要用 `ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION` 长期压制警告。升级后要检查所有 Job 中的重复引用、Runner 版本要求、`actionlint` 和实际 Workflow 运行结果。
 
 ## 推荐目录
 
@@ -162,6 +163,7 @@ Summary 中不得输出密码、Token、Webhook 签名或完整 Secret 值。
 11. Release manifest 是否按实际 Artifact 文件名正确识别 amd64/arm64 和实际镜像来源。
 12. HAP payload 是否包含固定字段、附件 URL 是否为 JSON 字符串、架构附件和 SHA256 是否来自实际 Release 产物。
 13. HAP 通知是否只在 URL 和开关都满足时执行。
+14. 如果 Annotations 提示 JavaScript Action 的 Node.js 20 已弃用，检查 Action 的 SHA 对应版本；这通常暂时只是警告，但 Node.js 20 被移除后可能变成运行失败，应升级 Action，不要误判为业务配置错误。
 
 常见故障和对应检查见 [references/failure-patterns.md](references/failure-patterns.md)。完整交付检查见 [references/workflow-checklist.md](references/workflow-checklist.md)。
 
@@ -172,6 +174,7 @@ Summary 中不得输出密码、Token、Webhook 签名或完整 Secret 值。
 - Python `ast.parse` 或等价语法检查
 - `bash -n` 检查 CI Shell 脚本
 - `actionlint` 检查 GitHub Actions Workflow
+- 检查第三方 JavaScript Action 是否支持当前 Node.js Runner；不能遗留 Node.js 20 弃用警告
 - `python .github/image-make/test_release.py` 检查 Release manifest 来源和 digest 镜像识别
 - `git diff --check`
 - 检查 Workflow 行为：push 的 `PUSH_OPERATION=auto`、push 指定三种模式、手动 build-release、手动 pull-release、手动 build-push-release、Aliyun 缺配置、HAP URL 缺失

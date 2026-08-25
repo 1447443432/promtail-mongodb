@@ -35,6 +35,7 @@
 - [ ] Workflow 全局权限为 `contents: read`，只有 Release Job 使用 `contents: write`
 - [ ] HAP URL 仅提供给配置检查和 Release；AppKey/Sign 仅提供给通知步骤
 - [ ] 第三方 Action 固定到 commit SHA，Docker Action 固定到镜像 digest
+- [ ] JavaScript Action 与当前 Runner 的 Node.js 版本兼容；没有遗留 Node.js 20 弃用或被强制切换到 Node.js 24 的警告
 - [ ] 没有使用 `DOCKER_CONTEXT` 作为构建目录变量
 - [ ] Alpine 源和版本通过 `ALPINE_MIRROR`、`ALPINE_VERSION` 配置
 - [ ] Dockerfile 没有重复执行 `apk update` 后再 `apk add --no-cache`
