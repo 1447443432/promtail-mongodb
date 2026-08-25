@@ -294,7 +294,7 @@ Repository Secrets:
 2. 配置阿里云后用 `build-push-release` 验证 Tag、Push 和 Release 附件。
 3. 配置 HAP 后再次运行 `build-release` 或 `build-push-release`，检查 Release Job 的 `HAP sync` 和通知步骤。
 4. 检查 HAP 接收到的 `repository`、`version`、两个架构下载地址和 SHA256 是否正确。
-5. 修改 Workflow 或 `.github/image-make/` 后，检查 `Workflow Lint` 是否通过；它使用固定版本的 `actionlint` 检查 GitHub Actions 语法和表达式。
+5. 修改 Workflow 或 `.github/image-make/` 后，检查 Image Make 的 `Validate GitHub Actions workflows` Job 是否通过；它使用固定版本的 `actionlint` 检查 GitHub Actions 语法和表达式。
 6. 运行 `python .github/image-make/test_release.py`，检查 Release manifest 的镜像来源和 digest 镜像识别。
 
 如果某个可选模块没有配置，不要根据灰色步骤判断失败；查看 `Check module configuration` 和 `Release` 的 Actions Summary，其中会写明模块是关闭、缺少哪些配置，还是执行成功。
@@ -303,7 +303,7 @@ Repository Secrets:
 
 ### Workflow 静态检查
 
-`.github/workflows/actionlint.yml` 会在 Workflow、镜像辅助脚本或项目构建配置变更时运行。它只检查 GitHub Actions 定义，不会执行 Docker 构建；需要本地检查时也可以安装同版本 `actionlint` 后运行：
+`image-make.yml` 的第一个 Job 会先运行 actionlint 和 Release manifest 测试。检查通过后才会进入 config、Build、Package 和 Release；检查失败时后续 Job 不会执行。它只检查 GitHub Actions 定义和最小脚本逻辑，不会执行 Docker 构建；需要本地检查时也可以安装同版本 `actionlint` 后运行：
 
 ```bash
 actionlint
@@ -311,7 +311,7 @@ actionlint
 
 Workflow 使用固定的 Action commit 和 actionlint 镜像 digest，升级依赖时应重新验证对应版本的行为。
 
-如果要求检查失败时禁止合并，请在 GitHub `Settings → Branches` 中将 `Workflow Lint / Validate GitHub Actions workflows` 设置为受保护分支的必需状态检查；单独的 Lint Workflow 不会自动阻止另一个 Workflow 启动。
+如果要求检查失败时禁止合并，请在 GitHub `Settings → Branches` 中将 `Image Make / Validate GitHub Actions workflows` 设置为受保护分支的必需状态检查。它只负责阻止合并；Push 到 `master` 时，Image Make 会在同一条 Workflow 内先检查再构建。
 
 ## CI 专用脚本
 

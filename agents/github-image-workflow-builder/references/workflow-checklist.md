@@ -73,6 +73,7 @@
 - [ ] 检查 HAP URL 为空
 - [ ] `actionlint` 检查通过
 - [ ] `python .github/image-make/test_release.py` 检查通过
-- [ ] 需要阻断合并时，Branch Protection 已将 Workflow Lint 设为必需检查
+- [ ] `image-make.yml` 的 lint Job 通过后才进入 config/Build/Package/Release
+- [ ] 需要阻断合并时，Branch Protection 已将 `Image Make / Validate GitHub Actions workflows` 设为必需检查
 - [ ] 用 `rg` 对 Workflow 和 CI 脚本执行项目个性化字符串审计
 - [ ] 确认复制到第二个项目时只需修改 `.image-build.env` 和 Dockerfile
