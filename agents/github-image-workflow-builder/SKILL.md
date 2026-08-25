@@ -15,6 +15,8 @@ metadata:
 
 三种运行模式必须保持语义一致：`build-release` 构建并打包创建 Release，`pull-release` 不构建而从已有阿里云镜像拉取后创建 Release，`build-push-release` 构建、推送阿里云并创建 Release。
 
+Git push 与手动运行要区分：push 不接收 `workflow_dispatch` 的 `operation`，使用 `PUSH_OPERATION` 配置选择 `auto`、`build-release`、`pull-release` 或 `build-push-release`，默认是 `auto`。只有 `ENABLE_ALIYUN_PUSH=true` 且 Aliyun Registry、账号密码和目标镜像地址完整时，`auto` 才选择 `build-push-release`；否则自动降级为 `build-release`。指定具体模式时必须严格执行指定模式，不能因为缺少 Aliyun 凭据而偷偷改成其他模式。手动选择 `build-push-release` 时仍必须严格校验配置，手动选择 `pull-release` 时仍只要求完整的拉取配置。
+
 ## 何时使用
 
 用户要求以下任一项时使用：
@@ -40,6 +42,8 @@ metadata:
 4. Dockerfile 保持手动可构建：默认值应允许 `docker build .` 在当前平台工作；CI 通过 `--build-arg BASE_IMAGE=...` 覆盖架构基础镜像。
 5. 主镜像名只作为本地 Build、Save 和 Release 中的镜像引用：不为主镜像名登录或推送，除非用户明确要求主仓库 Push。镜像引用可以不带 Tag；不带 Tag 时由 Docker 按 `latest` 解析，脚本不得拼接 `:latest` 或其他 Tag。
 6. 阿里云 Push 是独立模块：`build-push-release` 只有在 `ENABLE_ALIYUN_PUSH=true` 且 Registry、账号密码和目标镜像完整时才执行 `docker tag` 与 `docker push`；缺少配置时必须阻断该模式的 Build、Package 和 Release。`build-release` 不依赖阿里云配置。
+   - Git push 默认使用 `PUSH_OPERATION=auto`：先按上述条件选择 `build-push-release`，条件不满足时选择 `build-release`，并在 Workflow Summary 写明自动降级原因。
+   - `PUSH_OPERATION` 指定具体模式时必须按指定模式执行；其中 `pull-release` 不得误启动 Build，`build-push-release` 缺配置时必须阻断后续步骤。
 7. `pull-release` 不依赖 `ENABLE_ALIYUN_PUSH`，只要 Registry、账号密码、主镜像和阿里云镜像地址完整，就从阿里云拉取并打包；阿里云目标地址留空时复用对应主镜像的完整引用，填写后按用户配置原样使用，不得单独默认成 `latest` 或从 Release tag 推导 Tag。
 8. Release 选择镜像来源：`pull-release` 和 `build-push-release` 的清单记录阿里云镜像地址，`build-release` 记录主镜像地址。Release-only 模式无法访问本地 Build 时，必须明确要求可拉取的阿里云镜像，或先执行 Build。
 9. HAP Webhook 必须使用 nginx-make 兼容的通用 JSON 协议：固定输出 `project_name`、`repository`、`version`、`tag`、`release_url`、`amd64_name`、`amd64_url`、`amd64_sha256`、`arm64_name`、`arm64_url`、`arm64_sha256`、`attachment_urls`、`commit_sha`、`run_id`、`run_url`、`build_status`；其中 `attachment_urls` 是 JSON 字符串，不是 JSON 数组。项目名从 `RELEASE_NAME` 或仓库名推导，不能把项目字段硬编码到 CI 引擎。
@@ -94,6 +98,7 @@ workflow_dispatch 输入
 ```text
 IMAGE_TAG
 ARCHITECTURES
+PUSH_OPERATION
 RELEASE_NAME
 BASE_IMAGE_AMD64
 BASE_IMAGE_ARM64
@@ -169,7 +174,7 @@ Summary 中不得输出密码、Token、Webhook 签名或完整 Secret 值。
 - `actionlint` 检查 GitHub Actions Workflow
 - `python .github/image-make/test_release.py` 检查 Release manifest 来源和 digest 镜像识别
 - `git diff --check`
-- 检查 Workflow 行为：push 触发、手动 build-release、手动 pull-release、手动 build-push-release、Aliyun 缺配置、HAP URL 缺失
+- 检查 Workflow 行为：push 的 `PUSH_OPERATION=auto`、push 指定三种模式、手动 build-release、手动 pull-release、手动 build-push-release、Aliyun 缺配置、HAP URL 缺失
 - 对 Workflow 和 CI 脚本执行通用性审计，确认没有残留当前项目默认值
 - 如本机没有 Docker，明确说明未执行真实镜像构建，不要声称构建已验证
 

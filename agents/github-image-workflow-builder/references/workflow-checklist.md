@@ -19,6 +19,9 @@
 - [ ] `BASE_IMAGE_AMD64` 与 `BASE_IMAGE_ARM64` 独立
 - [ ] 主镜像名不要求认证
 - [ ] `build-release` 不依赖 Aliyun 配置
+- [ ] Git push 通过 `PUSH_OPERATION` 支持 `auto`、`build-release`、`pull-release`、`build-push-release`，默认 `auto`
+- [ ] Git push 使用 `PUSH_OPERATION=auto` 时，Aliyun 配置完整才选择 `build-push-release`，否则自动选择 `build-release` 并在 Summary 说明原因
+- [ ] Git push 指定 `pull-release` 时不启动 Build，指定 `build-push-release` 缺配置时阻断后续步骤
 - [ ] `build-push-release` 缺少 `ENABLE_ALIYUN_PUSH`、Registry、账号密码或目标镜像时阻断 Build/Package/Release
 - [ ] `pull-release` 不依赖 `ENABLE_ALIYUN_PUSH`，但要求完整的 Aliyun Registry、账号密码和镜像地址
 - [ ] HAP URL 缺失时只跳过通知

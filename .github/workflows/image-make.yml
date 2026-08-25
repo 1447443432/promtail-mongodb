@@ -56,8 +56,8 @@ on:
         type: boolean
 
 env:
-  WORKFLOW_OPERATION: ${{ github.event_name == 'push' && 'build-push-release' || inputs.operation }}
-  WORKFLOW_ARCHITECTURES: ${{ github.event_name == 'push' && 'all' || inputs.architectures }}
+  WORKFLOW_OPERATION: ${{ github.event_name == 'push' && 'auto' || inputs.operation }}
+  WORKFLOW_ARCHITECTURES: ${{ inputs.architectures }}
   REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME || secrets.ALIYUN_REGISTRY_USERNAME }}
   REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD || secrets.ALIYUN_REGISTRY_PASSWORD }}
   BASE_REGISTRY_USERNAME: ${{ secrets.BASE_REGISTRY_USERNAME }}
@@ -89,6 +89,7 @@ jobs:
     name: Check module configuration
     runs-on: ubuntu-24.04
     outputs:
+      operation: ${{ steps.check.outputs.operation }}
       tag: ${{ steps.check.outputs.tag }}
       release_name: ${{ steps.check.outputs.release_name }}
       architectures: ${{ steps.check.outputs.architectures }}
@@ -135,6 +136,7 @@ jobs:
           VAR_ALIYUN_REGISTRY: ${{ vars.ALIYUN_REGISTRY }}
           VAR_ALIYUN_IMAGE_AMD64: ${{ vars.ALIYUN_IMAGE_AMD64 }}
           VAR_ALIYUN_IMAGE_ARM64: ${{ vars.ALIYUN_IMAGE_ARM64 }}
+          VAR_PUSH_OPERATION: ${{ vars.PUSH_OPERATION }}
           VAR_ENABLE_ALIYUN_PUSH: ${{ vars.ENABLE_ALIYUN_PUSH }}
           VAR_ENABLE_RELEASE: ${{ vars.ENABLE_RELEASE }}
           VAR_ENABLE_HAP_WEBHOOK: ${{ vars.ENABLE_HAP_WEBHOOK }}
@@ -148,7 +150,7 @@ jobs:
 
   build:
     needs: config
-    if: ${{ needs.config.outputs.can_build == 'true' && (github.event_name == 'push' || inputs.operation != 'pull-release') }}
+    if: ${{ needs.config.outputs.can_build == 'true' && needs.config.outputs.operation != 'pull-release' }}
     strategy:
       fail-fast: false
       matrix:
@@ -190,7 +192,7 @@ jobs:
 
   package:
     needs: [config, build]
-    if: ${{ always() && needs.config.outputs.can_package == 'true' && ((github.event_name == 'push' && needs.build.result == 'success') || (github.event_name != 'push' && (((inputs.operation == 'build-release' || inputs.operation == 'build-push-release') && needs.build.result == 'success') || (inputs.operation == 'pull-release' && needs.build.result == 'skipped')))) }}
+    if: ${{ always() && needs.config.outputs.can_package == 'true' && ((needs.config.outputs.operation == 'pull-release' && needs.build.result == 'skipped') || (needs.config.outputs.operation != 'pull-release' && needs.build.result == 'success')) }}
     strategy:
       fail-fast: false
       matrix:
@@ -201,14 +203,14 @@ jobs:
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
       - name: Download packages from build jobs
-        if: ${{ github.event_name == 'push' || inputs.operation == 'build-release' || inputs.operation == 'build-push-release' }}
+        if: ${{ needs.config.outputs.operation != 'pull-release' }}
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: release-${{ matrix.architecture }}
           path: release-assets
       - name: Package or verify architecture image
         env:
-          PACKAGE_MODE: ${{ github.event_name == 'push' && 'verify' || inputs.operation }}
+          PACKAGE_MODE: ${{ needs.config.outputs.operation == 'pull-release' && 'pull-release' || 'verify' }}
           ARCHITECTURE: ${{ matrix.architecture }}
           TARGET_IMAGE: ${{ matrix.architecture == 'amd64' && needs.config.outputs.target_image_amd64 || needs.config.outputs.target_image_arm64 }}
           ALIYUN_IMAGE: ${{ matrix.architecture == 'amd64' && needs.config.outputs.aliyun_image_amd64 || needs.config.outputs.aliyun_image_arm64 }}
@@ -219,7 +221,7 @@ jobs:
           RELEASE_TAG: ${{ needs.config.outputs.tag }}
         run: bash .github/image-make/package.sh
       - name: Upload pull-release package
-        if: ${{ github.event_name != 'push' && inputs.operation == 'pull-release' }}
+        if: ${{ needs.config.outputs.operation == 'pull-release' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: release-${{ matrix.architecture }}
@@ -228,7 +230,7 @@ jobs:
 
   release:
     needs: [config, build, package]
-    if: ${{ always() && needs.config.outputs.can_release == 'true' && ((github.event_name == 'push' && needs.build.result == 'success' && needs.package.result == 'success') || (github.event_name != 'push' && (((inputs.operation == 'build-release' || inputs.operation == 'build-push-release') && needs.build.result == 'success' && needs.package.result == 'success') || (inputs.operation == 'pull-release' && needs.package.result == 'success')))) }}
+    if: ${{ always() && needs.config.outputs.can_release == 'true' && needs.package.result == 'success' && (needs.config.outputs.operation == 'pull-release' || needs.build.result == 'success') }}
     runs-on: ubuntu-24.04
     permissions:
       contents: write

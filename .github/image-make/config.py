@@ -99,16 +99,39 @@ aliyun_missing.extend(
 aliyun_configured = not aliyun_missing and primary
 base = all(item for architecture, item in (("amd64", base_amd64), ("arm64", base_arm64)) if architecture in selected)
 build_configuration_ready = primary and base and bool(architectures) and tag_valid
-operation = os.environ.get("OPERATION", "build-release")
+valid_operations = ("auto", "build-release", "pull-release", "build-push-release")
+push_operation = value("PUSH_OPERATION", None, "VAR_PUSH_OPERATION", "auto").lower()
+requested_operation = os.environ.get("OPERATION", "build-release")
+if event == "push" and requested_operation == "auto":
+    if push_operation == "auto":
+        operation = "build-push-release" if aliyun_enabled and aliyun_configured else "build-release"
+    elif push_operation in valid_operations[1:]:
+        operation = push_operation
+    else:
+        operation = "invalid"
+else:
+    operation = requested_operation
 can_push_aliyun = operation == "build-push-release" and aliyun_enabled and aliyun_configured
 can_pull_aliyun = operation == "pull-release" and aliyun_configured
 can_build = build_configuration_ready and (
-    operation != "build-push-release" or can_push_aliyun
+    operation in ("build-release", "build-push-release")
+    and (operation != "build-push-release" or can_push_aliyun)
 )
 can_package = release_enabled and operation in ("build-release", "build-push-release", "pull-release") and (can_pull_aliyun if operation == "pull-release" else can_build)
 can_release = can_package
 
 reasons = []
+if event == "push" and requested_operation == "auto":
+    if push_operation not in valid_operations:
+        reasons.append("Invalid PUSH_OPERATION; expected auto, build-release, pull-release or build-push-release.")
+    elif push_operation == "auto" and operation == "build-push-release":
+        reasons.append("Push event selected build-push-release; Aliyun push configuration is complete.")
+    elif push_operation == "auto" and aliyun_enabled:
+        reasons.append("Push event selected build-release; Aliyun push configuration is incomplete, so the build continues without Aliyun Push.")
+    elif push_operation == "auto":
+        reasons.append("Push event selected build-release; Aliyun Push is disabled.")
+    else:
+        reasons.append(f"Push event selected {operation} from PUSH_OPERATION.")
 if operation == "pull-release" and not can_pull_aliyun:
     reasons.append("Aliyun pull skipped; missing: " + ", ".join(aliyun_missing))
 elif operation == "build-push-release" and not aliyun_enabled:
@@ -140,6 +163,8 @@ def status(ok, missing=""):
 with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
     summary.write("# Image Make configuration\n\n")
     summary.write(f"- **Operation:** `{operation}`\n- **Release name:** `{release_name}`\n- **Release tag:** `{tag}`\n")
+    if event == "push":
+        summary.write(f"- **Push operation setting:** `{push_operation}`\n")
     summary.write(f"- **Dockerfile:** `{dockerfile}`\n- **Build context:** `{build_context}`\n\n")
     summary.write("| Module | Status | Details |\n|---|---|---|\n")
     summary.write(f"| Build | **{status(can_build)}** | architectures: `{', '.join(architectures) or 'invalid'}`, bases: `{base_amd64 or 'missing'}` / `{base_arm64 or 'missing'}` |\n")
@@ -155,6 +180,7 @@ with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
     summary.write("\n".join(f"- {item}" for item in reasons) + "\n")
 
 outputs = {
+    "operation": operation, "push_operation": push_operation,
     "tag": tag, "release_name": release_name, "architectures": json.dumps(architectures),
     "base_image_amd64": base_amd64, "base_image_arm64": base_arm64,
     "target_image_amd64": target_amd64, "target_image_arm64": target_arm64,
@@ -175,6 +201,9 @@ with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
 
 print("========== configuration result ==========")
 print("[OK] configuration resolved")
+print(f"operation={operation}")
+if event == "push":
+    print(f"push_operation={push_operation}")
 print(f"tag={tag}")
 print(f"build={'ready' if can_build else 'skipped'}")
 print(f"aliyun_push={'ready' if can_push_aliyun else 'skipped'}")

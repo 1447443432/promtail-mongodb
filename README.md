@@ -26,7 +26,7 @@ docker push 阿里云镜像
 阿里云：registry.cn-hangzhou.aliyuncs.com/hap-mdy/hap-promtail-vlogs-mongodb-amd64:1.0.0
 ```
 
-没有配置阿里云地址或账号密码时，`build-release` 仍然使用主镜像构建和发布；`build-push-release` 会直接跳过构建、打包和发布，并在 Actions Summary 中列出缺失配置。`pull-release` 只在阿里云地址、账号密码和镜像地址完整时执行。配置完整后，Push 或 Pull 产生的 Release 清单会记录实际使用的阿里云镜像地址。
+没有配置阿里云地址或账号密码时，`build-release` 仍然使用主镜像构建和发布；手动选择 `build-push-release` 时会直接跳过构建、打包和发布，并在 Actions Summary 中列出缺失配置。`pull-release` 只在阿里云地址、账号密码和镜像地址完整时执行。配置完整后，Push 或 Pull 产生的 Release 清单会记录实际使用的阿里云镜像地址。
 
 ## Workflow 运行模式
 
@@ -36,7 +36,9 @@ docker push 阿里云镜像
 - `pull-release`：使用已有阿里云镜像发布。
 - `build-push-release`：构建、推送阿里云并发布。
 
-这里的 `push` 仅表示 GitHub 的自动提交触发事件，不是手动运行模式。提交到 `master` 时，Workflow 默认执行 `build-push-release`；仅修改 `agents/` 时不会触发。
+这里的 `push` 仅表示 GitHub 的自动提交触发事件，不是手动运行模式。提交到 `master` 时，默认 `PUSH_OPERATION=auto`，Workflow 会按 `.image-build.env` 和 Repository Variables 自动选择：阿里云 Push 配置完整时执行 `build-push-release`，未配置或配置不完整时自动执行 `build-release`；如果指定了具体 `PUSH_OPERATION`，则严格按指定模式执行。仅修改 `agents/` 时不会触发。
+
+Git push 的模式可以通过 `PUSH_OPERATION` 配置，默认值为 `auto`。可选值为 `auto`、`build-release`、`pull-release`、`build-push-release`；配置为具体模式后，push 会严格按指定模式执行。该配置可写在 `.image-build.env`，也可用同名 Repository Variable 覆盖；手动 `Run workflow` 使用页面中的 `operation`，不受 `PUSH_OPERATION` 影响。
 
 手动输入项的含义：
 
@@ -169,6 +171,7 @@ GitHub Actions 会根据矩阵自动传入 `TARGETARCH=amd64` 或 `TARGETARCH=ar
 ```text
 IMAGE_TAG=1.0.0
 ARCHITECTURES=all
+PUSH_OPERATION=auto
 RELEASE_NAME=hap-promtail-vlogs-mongodb
 BASE_IMAGE_AMD64=alpine:3.23
 BASE_IMAGE_ARM64=alpine:3.23
@@ -183,7 +186,7 @@ ENABLE_HAP_WEBHOOK=true
 没有默认值的配置：
 
 - `HAP_WEBHOOK_URL`：没有默认值；为空时跳过 HAP 通知，并显示原因。
-- `ALIYUN_REGISTRY_USERNAME`、`ALIYUN_REGISTRY_PASSWORD`：没有默认值；`build-push-release` 或 `pull-release` 使用时必填。缺失时 `build-release` 不受影响，另外两种模式会停止后续步骤。
+- `ALIYUN_REGISTRY_USERNAME`、`ALIYUN_REGISTRY_PASSWORD`：没有默认值；手动选择 `build-push-release` 或 `pull-release` 时必填。Git push 使用 `PUSH_OPERATION=auto` 时，缺失配置会自动选择 `build-release`，不会阻断普通构建发布；若指定推送或拉取模式，则按该模式严格校验。
 - `BASE_REGISTRY_USERNAME`、`BASE_REGISTRY_PASSWORD`：没有默认值；只有基础镜像仓库为私有仓库时才需要。
 - `TARGET_IMAGE_AMD64`、`TARGET_IMAGE_ARM64`：通用 Workflow 没有默认镜像地址；当前项目的默认值来自 `.image-build.env`，地址按原样使用。复制到其他项目时必须替换成新项目的镜像地址。
 
@@ -213,6 +216,7 @@ Variables 用于在 GitHub 侧覆盖非敏感配置，不是全部必填。在 `
 | Name | 示例值/项目默认值 | 作用 |
 |---|---|---|
 | `IMAGE_TAG` | `latest` | Release tag；不配置时使用 `latest` |
+| `PUSH_OPERATION` | `auto` | Git push 模式：`auto`、`build-release`、`pull-release` 或 `build-push-release` |
 | `RELEASE_NAME` | `promtail-mongodb` | Release 名和 HAP `project_name`；不配置时使用仓库名 |
 | `TARGET_IMAGE_AMD64` | `registry.example.com/project/image-amd64` | amd64 主镜像地址，按原样使用 |
 | `TARGET_IMAGE_ARM64` | `registry.example.com/project/image-arm64` | arm64 主镜像地址，按原样使用 |
@@ -284,7 +288,7 @@ Repository Secrets:
   ALIYUN_REGISTRY_PASSWORD=<阿里云密码或 Token>
 ```
 
-阿里云 Registry、账号密码齐全且 `ENABLE_ALIYUN_PUSH=true` 时，`build-push-release` 执行 `docker tag` 和 `docker push`；阿里云目标地址留空时复用对应主镜像地址，填写后按原样使用。缺少配置时，`build-release` 不受影响；`build-push-release` 会停止后续构建、打包和 Release，避免模式名称与实际行为不一致。`pull-release` 不依赖 `ENABLE_ALIYUN_PUSH`，只检查完整的阿里云拉取配置。
+阿里云 Registry、账号密码齐全且 `ENABLE_ALIYUN_PUSH=true` 时，`build-push-release` 执行 `docker tag` 和 `docker push`；阿里云目标地址留空时复用对应主镜像地址，填写后按原样使用。手动选择 `build-push-release`，或将 Git push 的 `PUSH_OPERATION` 指定为该模式时，缺少配置会停止后续构建、打包和 Release。`PUSH_OPERATION=auto` 时，缺少配置会自动降级为 `build-release`，并在 Summary 中说明原因。`pull-release` 不依赖 `ENABLE_ALIYUN_PUSH`，只检查完整的阿里云拉取配置。
 
 ### 配置后的验证建议
 
